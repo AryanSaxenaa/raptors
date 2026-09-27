@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Teams &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>Teams</h1>
+<p class="lede">
+  Create a team or join with an invite code before submitting a project.
+  Writes go through the same JSON API as external clients.
+</p>
+
+<form class="panel" method="get" action="/teams" style="display:flex; gap:12px; align-items:flex-end">
+  <div style="flex:1">
+    <label for="event">Event</label>
+    <select id="event" name="event" onchange="this.form.submit()">
+      {% for e in events %}
+        <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div id="flash" class="notice" hidden></div>
+
+{% if who.is_anonymous %}
+  <div class="notice bad"><a href="/login">Sign in</a> as a participant to create or join a team.</div>
+{% else %}
+  <div class="grid c2">
+    <div class="panel">
+      <h3>Create a team</h3>
+      <label for="team-name">Display name</label>
+      <input id="team-name" placeholder="Team name">
+      <div style="margin-top:14px"><button id="create-team">Create team</button></div>
+      <p class="sum" style="margin-top:12px">Duplicate names are allowed; identity is the team id.</p>
+    </div>
+    <div class="panel">
+      <h3>Join with invite code</h3>
+      <label for="invite">Invite code</label>
+      <input id="invite" placeholder="paste code from invite link" value="{{ invite_prefill }}">
+      <div style="margin-top:14px"><button id="join-team">Join team</button></div>
+    </div>
+  </div>
+
+  <h2>Your teams on this event</h2>
+  <div class="panel">
+    {% if my_teams %}
+      <table>
+        <thead><tr><th>Name</th><th>Team id</th><th></th></tr></thead>
+        <tbody>
+          {% for t in my_teams %}
+            <tr>
+              <td>{{ t.name }}</td>
+              <td class="mono">{{ t.id }}</td>
+              <td><a href="/projects/new?event={{ event.id }}">Submit a project</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="sum">You are not on a team for this event yet.</p>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const eventId = {{ event.id | tojson }};
+document.getElementById('create-team')?.addEventListener('click', async () => {
+  const name = document.getElementById('team-name').value.trim();
+  if (!name) { flash('Enter a team name.', 'warn'); return; }
+  try {
+    const res = await api('POST', '/api/events/' + eventId + '/teams', {name});
+    flash('Created ' + res.name + '. Invite: ' + res.invite_code, 'ok');
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { flash(e.message, 'bad'); }
+});
+document.getElementById('join-team')?.addEventListener('click', async () => {
+  const invite_code = document.getElementById('invite').value.trim();
+  if (!invite_code) { flash('Paste an invite code.', 'warn'); return; }
+  try {
+    const res = await api('POST', '/api/teams/join', {invite_code});
+    flash('Joined ' + res.name + '.', 'ok');
+    setTimeout(() => location.href = '/projects/new?event=' + encodeURIComponent(res.event_id), 600);
+  } catch (e) { flash(e.message, 'bad'); }
+});
+</script>
+{% endblock %}

@@ -369,11 +369,7 @@ def organizer_results(
 def organizer_audit(
     request: Request, conn: Conn, who: Who, action: str | None = None, limit: int = 150
 ) -> Any:
-    """The audit trail, readable without a database client.
-
-    Run the acceptance suite and then load this page: the isolation denial it
-    provokes is a row here, naming judge B, the capability and the reason code.
-    """
+    """The audit trail, readable without a database client."""
     if not has_capability(who.role, Capability.AUDIT_LOG):
         return RedirectResponse("/login", status_code=303)
     return _templates(request).TemplateResponse(
@@ -392,3 +388,129 @@ def organizer_audit(
             ],
         },
     )
+
+
+@router.get("/teams", response_class=HTMLResponse)
+def teams_page(
+    request: Request,
+    conn: Conn,
+    who: Who,
+    event: str | None = None,
+    invite: str | None = Query(default=None),
+) -> Any:
+    event_id = event or default_event_id(conn)
+    row = query_one(conn, "SELECT * FROM events WHERE id = ?", (event_id,))
+    if row is None:
+        raise ApiError("not_found", f"no event '{event_id}'")
+    my_teams = (
+        query(
+            conn,
+            "SELECT t.id, t.name FROM teams t JOIN team_members tm ON tm.team_id = t.id "
+            "WHERE t.event_id = ? AND tm.user_id = ? ORDER BY t.name",
+            (event_id, who.user_id),
+        )
+        if who.user_id
+        else []
+    )
+    return _templates(request).TemplateResponse(
+        request,
+        "teams.html",
+        {
+            **_base(request, conn, who),
+            "event": dict(row),
+            "my_teams": [dict(t) for t in my_teams],
+            "invite_prefill": invite or "",
+        },
+    )
+
+
+@router.get("/teams/join/{invite_code}", response_class=HTMLResponse)
+def teams_join_link(
+    request: Request, conn: Conn, who: Who, invite_code: str, event: str | None = None
+) -> Any:
+    team = query_one(conn, "SELECT event_id FROM teams WHERE invite_code = ?", (invite_code,))
+    event_id = event or (team["event_id"] if team else default_event_id(conn))
+    return teams_page(request, conn, who, event=event_id, invite=invite_code)
+
+
+@router.get("/vote", response_class=HTMLResponse)
+def vote_page(request: Request, conn: Conn, who: Who, event: str | None = None) -> Any:
+    event_id = event or default_event_id(conn)
+    row = query_one(conn, "SELECT * FROM events WHERE id = ?", (event_id,))
+    if row is None:
+        raise ApiError("not_found", f"no event '{event_id}'")
+    from ..routers.community import VOTE_CREDIT_BUDGET
+
+    return _templates(request).TemplateResponse(
+        request,
+        "vote.html",
+        {
+            **_base(request, conn, who),
+            "event": dict(row),
+            "credit_budget": VOTE_CREDIT_BUDGET,
+        },
+    )
+
+
+@router.get("/organizer/setup", response_class=HTMLResponse)
+def organizer_setup(request: Request, conn: Conn, who: Who, event: str | None = None) -> Any:
+    event_id = event or default_event_id(conn)
+    if not has_capability(who.role, Capability.AGGREGATE):
+        return RedirectResponse("/login", status_code=303)
+    row = query_one(conn, "SELECT * FROM events WHERE id = ?", (event_id,))
+    if row is None:
+        raise ApiError("not_found", f"no event '{event_id}'")
+    tracks = query(
+        conn, "SELECT id, name FROM tracks WHERE event_id = ? ORDER BY id", (event_id,)
+    )
+    return _templates(request).TemplateResponse(
+        request,
+        "organizer_setup.html",
+        {
+            **_base(request, conn, who),
+            "event": dict(row),
+            "tracks": [dict(t) for t in tracks],
+        },
+    )
+
+
+@router.get("/organizer/webhooks", response_class=HTMLResponse)
+def organizer_webhooks_page(request: Request, conn: Conn, who: Who) -> Any:
+    if not has_capability(who.role, Capability.AGGREGATE):
+        return RedirectResponse("/login", status_code=303)
+    hooks = query(
+        conn,
+        "SELECT id, event_id, url, active FROM webhooks WHERE active = 1 ORDER BY created_at DESC",
+    )
+    return _templates(request).TemplateResponse(
+        request,
+        "organizer_webhooks.html",
+        {**_base(request, conn, who), "hooks": [dict(h) for h in hooks]},
+    )
+
+
+@router.get("/embed/gallery", response_class=HTMLResponse)
+def embed_gallery(
+    request: Request,
+    conn: Conn,
+    event: str | None = None,
+    limit: int = Query(default=20, ge=1, le=50),
+) -> Any:
+    event_id = event or default_event_id(conn)
+    row = query_one(conn, "SELECT id, name FROM events WHERE id = ?", (event_id,))
+    if row is None:
+        raise ApiError("not_found", f"no event '{event_id}'")
+    items, total = gallery_rows(conn, event_id=event_id, limit=limit, offset=0)
+    config = request.app.state.settings
+    response = _templates(request).TemplateResponse(
+        request,
+        "embed_gallery.html",
+        {
+            "event": dict(row),
+            "projects": items,
+            "total": total,
+            "portal_url": config.base_url.rstrip("/"),
+        },
+    )
+    response.headers["Content-Security-Policy"] = "frame-ancestors *"
+    return response

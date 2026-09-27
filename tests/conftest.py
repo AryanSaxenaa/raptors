@@ -45,6 +45,7 @@ def seeded_conn(settings):
 def app(settings: Settings) -> Generator:
     os.environ["DOGFOOD_DB"] = str(settings.db_path)
     os.environ["DOGFOOD_DEV_TOKENS"] = "1"
+    os.environ["DOGFOOD_WEBHOOK_WORKER"] = "0"
     summary = bootstrap(settings.db_path, settings.fixtures_path, dev_tokens=True)
     assert summary.get("seeded"), summary
     application = create_app(settings, run_bootstrap=False)

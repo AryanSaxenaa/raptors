@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Community vote &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>Community vote</h1>
+<p class="lede">
+  Quadratic voting: spend up to <b>{{ credit_budget }}</b> credits across projects.
+  Influence on each project is the square root of credits you assign there.
+  Ballot order is shuffled per voter to reduce position bias.
+</p>
+
+<form class="panel" method="get" action="/vote" style="display:flex; gap:12px; align-items:flex-end">
+  <div style="flex:1">
+    <label for="event">Event</label>
+    <select id="event" name="event" onchange="this.form.submit()">
+      {% for e in events %}
+        <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div id="flash" class="notice" hidden></div>
+
+<div class="panel">
+  <p class="sum" id="budget">Loading ballot…</p>
+  <div id="ballot"></div>
+</div>
+
+<p class="sum">
+  Results stay embargoed until the organizer publishes.
+  Organizers can inspect tallies at <code>/api/events/{{ event.id }}/vote-results</code>.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const eventId = {{ event.id | tojson }};
+
+function appendBallotRow(root, p, creditBudget) {
+  const row = document.createElement('div');
+  row.style.borderTop = '1px solid var(--line)';
+  row.style.padding = '12px 0';
+
+  const head = document.createElement('div');
+  const link = document.createElement('a');
+  link.href = '/projects/' + encodeURIComponent(p.id);
+  const title = document.createElement('b');
+  title.textContent = p.title || '';
+  link.appendChild(title);
+  head.appendChild(link);
+  head.appendChild(document.createTextNode(' '));
+  const idSpan = document.createElement('span');
+  idSpan.className = 'dim mono';
+  idSpan.textContent = p.id || '';
+  head.appendChild(idSpan);
+  row.appendChild(head);
+
+  const tag = document.createElement('div');
+  tag.className = 'dim';
+  tag.textContent = p.tagline || '';
+  row.appendChild(tag);
+
+  const label = document.createElement('label');
+  label.textContent = 'Credits ';
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '1';
+  input.max = String(creditBudget);
+  input.value = '1';
+  input.dataset.project = p.id;
+  input.style.cssText = 'width:80px;margin-left:8px';
+  label.appendChild(input);
+  row.appendChild(label);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = 'Cast vote';
+  btn.dataset.vote = p.id;
+  row.appendChild(document.createTextNode(' '));
+  row.appendChild(btn);
+
+  btn.addEventListener('click', async () => {
+    const credits = parseInt(input.value, 10) || 1;
+    btn.disabled = true;
+    try {
+      await api('POST', '/api/events/' + eventId + '/votes', {
+        project_id: p.id,
+        credits,
+      });
+      flash('Vote recorded.', 'ok');
+      await loadBallot();
+    } catch (e) {
+      flash(e.message, 'bad');
+      btn.disabled = false;
+    }
+  });
+
+  root.appendChild(row);
+}
+
+async function loadBallot() {
+  const ballot = await api('GET', '/api/events/' + eventId + '/ballot');
+  document.getElementById('budget').textContent =
+    'Mode: ' + ballot.voter_mode + ' · spent ' + ballot.credits_spent +
+    ' / ' + ballot.credit_budget + ' credits · remaining ' + ballot.credits_remaining;
+  const root = document.getElementById('ballot');
+  root.replaceChildren();
+  ballot.projects.forEach(p => appendBallotRow(root, p, ballot.credit_budget));
+}
+
+loadBallot().catch(e => flash(e.message, 'bad'));
+</script>
+{% endblock %}

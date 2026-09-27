@@ -28,9 +28,22 @@ OpenAPI: [docs/openapi.json](docs/openapi.json) (also live at `/openapi.json` wh
 ## What this does not do yet
 
 - **Pairwise judging** — Bradley–Terry mode sketched in `JUDGING.md`, not implemented.
-- **T3/T4 tier claims in `.dogfood.toml`** — community voting, webhooks, and related bonuses ship in code but are not claimed because `run.py` cannot verify them.
-- **Production hardening** — dev tokens default on in local config; set `DOGFOOD_DEV_TOKENS=0` for real deployments.
+- **Participant certificates** — judge participation records are hash-anchored JSON (see judge console); not an external signing workflow.
+- **T3/T4 in `.dogfood.toml`** — still only **T1/T2 claimed** because `run.py` verifies those tiers only.
+- **Production hardening** — dev tokens default on in local/Docker demo config; set `DOGFOOD_DEV_TOKENS=0` for real deployments.
 - **DDoS / multi-tenant isolation** — see `THREAT-MODEL.md`.
+
+## UI surfaces
+
+| Page | URL |
+| --- | --- |
+| Teams | `/teams` |
+| Community vote | `/vote` |
+| Organizer setup | `/organizer/setup` |
+| Webhooks | `/organizer/webhooks` |
+| Embeddable gallery | `/embed/gallery` + `/static/embed.js` |
+
+Details: [docs/ui-coverage.md](docs/ui-coverage.md).
 
 ## Quick start
 
@@ -60,6 +73,8 @@ docker compose up --build
 
 Portal: http://localhost:8080
 
+**Build vs run:** image build needs network once (`apt-get`, `pip`). After that, `docker compose up` uses only the container, SQLite on a volume, and bundled fixtures — no external services at runtime.
+
 ## Acceptance (what `run.py` checks)
 
 | Check | Route / behaviour |
@@ -72,7 +87,7 @@ Portal: http://localhost:8080
 | T2 participant blocked | `GET /api/judge/scores` as participant → 401/403 |
 | T2 CSV | `GET /api/exports/results.csv` as organizer → 200, comma in header |
 
-`.dogfood.toml` sets `claimed = ["T1", "T2"]` so the report footer is clean (`claimed T1 T2, verified T1 T2`). T3/T4 features ship in the repo but are not claimed in the config because the suite cannot verify them.
+`.dogfood.toml` sets `claimed = ["T1", "T2"]` so the report footer is clean (`claimed T1 T2, verified T1 T2`). Extra T3/T4 work (comments, voting API, exports, audit) exists in the repo but is not claimed in the config because the checker cannot verify it.
 
 ## Key design choices
 
@@ -86,15 +101,15 @@ Portal: http://localhost:8080
 ## Tests
 
 ```bash
-python -m pytest tests/ -q --ignore=tests/smoke.py
-python tests/smoke.py    # black-box; use a fresh DB for strict counts
+python -m pytest tests/ -q --ignore=tests/smoke.py   # 63 tests; ~10 min locally (each test re-seeds fixtures)
+python tests/smoke.py    # black-box; 193 checks; use a fresh DB for strict counts
 ```
 
-For a clean smoke run against a remote host, point `python tests/smoke.py http://host:port` at the target. On `localhost`, smoke resets the database first via `python -m dogfood reset`.
+CI runs the same pytest command on push (`.github/workflows/ci.yml`). For a clean smoke run against a remote host, point `python tests/smoke.py http://host:port` at the target. On `localhost`, smoke resets the database first via `python -m dogfood reset`.
 
 ## Beyond the verified tiers
 
-Shipped but not in `run.py`: community comments and rate limits, quadratic voting with per-voter ballot shuffle, bulk JSON import/export, hash-chained audit log, judge participation records. Each is reachable via the API the UI uses.
+Shipped in code but not in `run.py`: community **comments** and **quadratic voting** (UI at `/vote`), **webhooks** (API + `/organizer/webhooks`), **embeddable gallery** (`/embed/gallery`, `embed.js`), bulk import/export, hash-chained audit log, judge participation records on the judge console.
 
 ## Layout
 
@@ -112,6 +127,7 @@ DATA-MODEL.md         schema and import/export
 JUDGING.md            assignment, rubric, normalization
 THREAT-MODEL.md       mitigations and non-claims
 docs/migration.md     move between hosts
+docs/ui-coverage.md   which flows have HTML vs API-only
 docs/openapi.json     committed OpenAPI snapshot
 ```
 

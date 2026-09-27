@@ -10,6 +10,7 @@ not accept a request until the data behind it is present and counted.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import uuid
@@ -97,7 +98,10 @@ def _startup_banner(summary: dict[str, Any], config: Settings) -> None:
             "        deployment that is not a laptop.",
         ]
     lines += ["", "next:", "  python3 run.py .dogfood.toml > acceptance-report.txt", ""]
-    print("\n".join(lines), flush=True)
+    text = "\n".join(lines)
+    print(text, flush=True)
+    # OSC 8 hyperlink — clickable in Windows Terminal, iTerm2, VS Code, etc.
+    print(f"\033]8;;{config.base_url}\033\\Open in browser: {config.base_url}\033]8;;\033\\", flush=True)
 
 
 def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) -> FastAPI:
@@ -114,7 +118,20 @@ def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) ->
                 _startup_banner(summary, config)
         else:
             app.state.seed_summary = {"seeded": False, "reason": "bootstrap skipped"}
-        yield
+        worker_enabled = (
+            os.environ.get("DOGFOOD_WEBHOOK_WORKER", "1") != "0" and not app.state.quiet
+        )
+        if worker_enabled:
+            from . import webhooks
+
+            webhooks.start_outbox_worker(config.db_path)
+        try:
+            yield
+        finally:
+            if worker_enabled:
+                from . import webhooks
+
+                webhooks.stop_outbox_worker()
 
     app = FastAPI(
         title="Dogfood Portal",
@@ -152,7 +169,7 @@ def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) ->
         response.headers["X-Request-Id"] = request_id
         return response
 
-    from .routers import auth, community, events, judging, organizer, projects, web
+    from .routers import auth, community, events, judging, organizer, projects, web, webhooks
 
     app.include_router(auth.router)
     app.include_router(events.router)
@@ -160,6 +177,7 @@ def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) ->
     app.include_router(judging.router)
     app.include_router(organizer.router)
     app.include_router(community.router)
+    app.include_router(webhooks.router)
     app.include_router(web.router)
 
     if config.static_dir.is_dir():

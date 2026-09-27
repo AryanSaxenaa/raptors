@@ -18,8 +18,11 @@
     <nav>
       <a href="/projects">Gallery</a>
       <a href="/projects/new">Submit</a>
+      <a href="/teams">Teams</a>
+      <a href="/vote">Vote</a>
       {% if is_judge %}<a href="/judge">Judge console</a>{% endif %}
       {% if can_aggregate %}<a href="/organizer">Organizer</a>
+      <a href="/organizer/setup">Setup</a>
       <a href="/organizer/results">Results</a>{% endif %}
       {% if can_audit %}<a href="/organizer/audit">Audit</a>{% endif %}
       <a href="/docs">API</a>
@@ -42,6 +45,7 @@
   Dogfood Portal &middot; open source, self-hosted, no external services &middot;
   <a href="/openapi.json">OpenAPI</a> &middot;
   <a href="/api/health">health</a> &middot;
+  <a href="/embed/gallery">embed gallery</a> &middot;
   <a href="/api/auth/matrix">role matrix</a>
 </footer>
 

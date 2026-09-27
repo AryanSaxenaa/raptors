@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Event setup &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>Event setup</h1>
+<p class="lede">
+  Configure events, tracks, and judges from the UI. Every action below calls the
+  public JSON API documented at <a href="/docs">/docs</a>.
+</p>
+
+<form class="panel" method="get" action="/organizer/setup" style="display:flex; gap:12px; align-items:flex-end">
+  <div style="flex:1">
+    <label for="event">Working event</label>
+    <select id="event" name="event" onchange="this.form.submit()">
+      {% for e in events %}
+        <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div id="flash" class="notice" hidden></div>
+
+<div class="grid c2">
+  <div class="panel">
+    <h3>Create a new event</h3>
+    <label for="ev-name">Name</label>
+    <input id="ev-name">
+    <label for="ev-close">Submissions close (ISO8601 UTC)</label>
+    <input id="ev-close" placeholder="2026-03-01T23:59:59Z">
+    <div style="margin-top:14px"><button id="create-event">Create event</button></div>
+  </div>
+  <div class="panel">
+    <h3>Publish &amp; voting window</h3>
+    <label><input type="checkbox" id="pub" {% if event.results_published %}checked{% endif %}> Results published</label>
+    <label for="vopen">Voting opens</label>
+    <input id="vopen" value="{{ event.voting_opens_at or '' }}">
+    <label for="vclose">Voting closes</label>
+    <input id="vclose" value="{{ event.voting_closes_at or '' }}">
+    <div style="margin-top:14px"><button id="save-event">Save event settings</button></div>
+  </div>
+</div>
+
+<div class="grid c2">
+  <div class="panel">
+    <h3>Add track</h3>
+    <label for="track-name">Track name</label>
+    <input id="track-name">
+    <div style="margin-top:14px"><button id="add-track">Add track</button></div>
+    <p class="sum" style="margin-top:10px">Tracks on this event:</p>
+    <ul>{% for t in tracks %}<li class="mono">{{ t.id }} — {{ t.name }}</li>{% endfor %}</ul>
+  </div>
+  <div class="panel">
+    <h3>Invite judge</h3>
+    <label for="j-name">Name</label>
+    <input id="j-name">
+    <label for="j-email">Email</label>
+    <input id="j-email" type="email">
+    <label>Tracks</label>
+    {% for t in tracks %}
+      <label><input type="checkbox" class="j-track" value="{{ t.id }}"> {{ t.name }}</label><br>
+    {% endfor %}
+    <div style="margin-top:14px"><button id="invite-judge">Send invite</button></div>
+  </div>
+</div>
+
+<p><a href="/organizer">Back to progress dashboard</a> · <a href="/organizer/webhooks">Webhooks</a></p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const eventId = {{ event.id | tojson }};
+
+document.getElementById('create-event')?.addEventListener('click', async () => {
+  const name = document.getElementById('ev-name').value.trim();
+  const submissions_close = document.getElementById('ev-close').value.trim() || null;
+  if (!name) { flash('Event name required.', 'warn'); return; }
+  try {
+    const ev = await api('POST', '/api/events', {name, submissions_close});
+    flash('Created ' + ev.name + ' (' + ev.id + ').', 'ok');
+    location.href = '/organizer/setup?event=' + encodeURIComponent(ev.id);
+  } catch (e) { flash(e.message, 'bad'); }
+});
+
+document.getElementById('save-event')?.addEventListener('click', async () => {
+  try {
+    await api('PATCH', '/api/events/' + eventId, {
+      results_published: document.getElementById('pub').checked,
+      voting_opens_at: document.getElementById('vopen').value || null,
+      voting_closes_at: document.getElementById('vclose').value || null,
+    });
+    flash('Event updated.', 'ok');
+  } catch (e) { flash(e.message, 'bad'); }
+});
+
+document.getElementById('add-track')?.addEventListener('click', async () => {
+  const name = document.getElementById('track-name').value.trim();
+  if (!name) { flash('Track name required.', 'warn'); return; }
+  try {
+    await api('POST', '/api/events/' + eventId + '/tracks', {name, description: ''});
+    flash('Track added.', 'ok');
+    location.reload();
+  } catch (e) { flash(e.message, 'bad'); }
+});
+
+document.getElementById('invite-judge')?.addEventListener('click', async () => {
+  const name = document.getElementById('j-name').value.trim();
+  const email = document.getElementById('j-email').value.trim();
+  const tracks = [...document.querySelectorAll('.j-track:checked')].map(el => el.value);
+  if (!name || !email) { flash('Name and email required.', 'warn'); return; }
+  try {
+    const res = await api('POST', '/api/events/' + eventId + '/judges', {name, email, tracks});
+    flash('Invited ' + res.email + '. Invite link: ' + res.invite_link, 'ok');
+  } catch (e) { flash(e.message, 'bad'); }
+});
+</script>
+{% endblock %}

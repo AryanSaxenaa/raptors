@@ -70,6 +70,13 @@
   </div>
 
   <div class="panel">
+    <h3>Participation record</h3>
+    <p class="sum">Hash-anchored JSON statement of reviews completed on this event.</p>
+    <button id="cert" class="ghost" type="button">Download judge record</button>
+    <pre id="cert-out" class="block" hidden></pre>
+  </div>
+
+  <div class="panel">
     <h3>What you cannot see</h3>
     <p class="sum">
       Another judge's ballots, any project outside your tracks, the aggregate
@@ -78,5 +85,20 @@
       it: <code>/api/judge/scores?judge=jdg_02</code>.
     </p>
   </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if judge %}
+<script>
+document.getElementById('cert')?.addEventListener('click', async () => {
+  try {
+    const record = await api('GET', '/api/judges/{{ judge.id }}/record');
+    const pre = document.getElementById('cert-out');
+    pre.hidden = false;
+    pre.textContent = JSON.stringify(record, null, 2);
+  } catch (e) { flash(e.message, 'bad'); }
+});
+</script>
 {% endif %}
 {% endblock %}

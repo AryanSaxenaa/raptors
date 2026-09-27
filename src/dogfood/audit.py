@@ -87,7 +87,27 @@ def record(
             _entry_hash(prev_hash, payload),
         ),
     )
-    return int(cursor.lastrowid or 0)
+    seq = int(cursor.lastrowid or 0)
+    try:
+        from . import webhooks
+
+        webhooks.enqueue_for_audit(
+            conn,
+            event_id=event_id,
+            action=action,
+            payload={
+                "seq": seq,
+                "actor_user_id": actor_user_id,
+                "actor_role": actor_role,
+                "target_type": target_type,
+                "target_id": target_id,
+                "reason_code": reason_code,
+                "detail": detail or {},
+            },
+        )
+    except Exception:
+        pass
+    return seq
 
 
 def verify_chain(conn: sqlite3.Connection) -> dict[str, Any]:

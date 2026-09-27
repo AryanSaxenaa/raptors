@@ -26,6 +26,7 @@ Scope: a self-hosted hackathon portal operated by an organizer who controls the 
 | DDoS | No CDN or WAF; rate limits are application-level only |
 | Secret dev tokens | `DOGFOOD_DEV_TOKENS=1` uses known tokens for acceptance; must be off in production |
 | End-to-end encryption | Projects are stored in plaintext SQLite |
+| Pairwise judging mode | Not implemented; rubric + normalization only |
 
 ## Recommended production settings
 

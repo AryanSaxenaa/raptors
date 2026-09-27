@@ -41,8 +41,8 @@
   <div class="notice bad">You are not signed in. <a href="/login">Sign in</a> as a participant.</div>
 {% elif not teams %}
   <div class="notice warn">
-    You are not on a team for this event. Create one or join with an invite link
-    before submitting &mdash; see <code>POST /api/events/{{ event.id }}/teams</code>.
+    You are not on a team for this event. <a href="/teams?event={{ event.id }}">Create or join a team</a>
+    before submitting.
   </div>
 {% endif %}
 

@@ -24,6 +24,7 @@
     </p>
   </div>
 
+  {% if settings.dev_tokens %}
   <div class="panel">
     <h3>Seeded sessions</h3>
     <p class="sum">
@@ -49,6 +50,14 @@
       <div style="margin-top:14px"><button id="signout" class="ghost">Sign out</button></div>
     {% endif %}
   </div>
+  {% else %}
+  <div class="panel">
+    <p class="sum">Dev session tokens are disabled (<code>DOGFOOD_DEV_TOKENS=0</code>). Use email and password only.</p>
+    {% if not who.is_anonymous %}
+      <div style="margin-top:14px"><button id="signout" class="ghost">Sign out</button></div>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <div class="panel">

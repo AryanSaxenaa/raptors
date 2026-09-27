@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Webhooks &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>Webhooks</h1>
+<p class="lede">
+  Signed JSON POSTs on audit events. Verify with
+  <code>X-Dogfood-Signature: sha256=HMAC(body)</code> using the secret shown once at registration.
+</p>
+
+<div id="flash" class="notice" hidden></div>
+
+<div class="panel">
+  <h3>Register endpoint</h3>
+  <label for="url">URL</label>
+  <input id="url" placeholder="https://example.com/hooks/dogfood">
+  <label for="hook-event">Limit to event id (optional)</label>
+  <input id="hook-event" placeholder="evt_01 or leave blank for all">
+  <div style="margin-top:14px"><button id="register">Register webhook</button></div>
+  <pre id="secret" class="sum" hidden></pre>
+</div>
+
+<h2>Active subscriptions</h2>
+<div class="panel scroll">
+  <table>
+    <thead><tr><th>Id</th><th>Event</th><th>URL</th><th></th></tr></thead>
+    <tbody>
+      {% for h in hooks %}
+        <tr>
+          <td class="mono">{{ h.id }}</td>
+          <td class="mono">{{ h.event_id or 'all' }}</td>
+          <td>{{ h.url }}</td>
+          <td>
+            <button class="ghost" data-test="{{ h.id }}">Test</button>
+            <button class="ghost" data-del="{{ h.id }}">Disable</button>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not hooks %}<p class="sum">No webhooks yet.</p>{% endif %}
+</div>
+
+<p><a href="/organizer/setup">Event setup</a> · <a href="/organizer">Dashboard</a></p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('register')?.addEventListener('click', async () => {
+  const url = document.getElementById('url').value.trim();
+  const event_id = document.getElementById('hook-event').value.trim() || null;
+  if (!url) { flash('URL required.', 'warn'); return; }
+  try {
+    const res = await api('POST', '/api/webhooks', {url, event_id, actions: ['*']});
+    const pre = document.getElementById('secret');
+    pre.hidden = false;
+    pre.textContent = 'Secret (copy now): ' + res.secret + '\n' + res.signing;
+    flash('Webhook registered.', 'ok');
+    setTimeout(() => location.reload(), 2000);
+  } catch (e) { flash(e.message, 'bad'); }
+});
+document.querySelectorAll('button[data-test]').forEach(b => b.addEventListener('click', async () => {
+  try {
+    const res = await api('POST', '/api/webhooks/' + b.dataset.test + '/test');
+    flash(res.success ? 'Test delivery OK' : ('Test failed: ' + (res.error || res.status_code)), res.success ? 'ok' : 'bad');
+  } catch (e) { flash(e.message, 'bad'); }
+}));
+document.querySelectorAll('button[data-del]').forEach(b => b.addEventListener('click', async () => {
+  try {
+    await api('DELETE', '/api/webhooks/' + b.dataset.del);
+    location.reload();
+  } catch (e) { flash(e.message, 'bad'); }
+}));
+</script>
+{% endblock %}

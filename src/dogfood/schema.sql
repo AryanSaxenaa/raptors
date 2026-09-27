@@ -355,3 +355,41 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS audit_event_idx  ON audit_log (event_id, seq);
 CREATE INDEX IF NOT EXISTS audit_action_idx ON audit_log (action, seq);
 CREATE INDEX IF NOT EXISTS audit_actor_idx  ON audit_log (actor_user_id, seq);
+
+-- ---------------------------------------------------------------- webhooks ---
+
+CREATE TABLE IF NOT EXISTS webhooks (
+    id         TEXT PRIMARY KEY,
+    event_id   TEXT REFERENCES events (id) ON DELETE CASCADE,
+    url        TEXT NOT NULL CHECK (length(trim(url)) > 0),
+    secret     TEXT NOT NULL,
+    actions    TEXT NOT NULL DEFAULT '["*"]',
+    active     INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS webhooks_event_idx ON webhooks (event_id, active);
+
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+    id          TEXT PRIMARY KEY,
+    webhook_id  TEXT NOT NULL REFERENCES webhooks (id) ON DELETE CASCADE,
+    action      TEXT NOT NULL,
+    status_code INTEGER,
+    success     INTEGER NOT NULL CHECK (success IN (0, 1)),
+    attempt     INTEGER NOT NULL DEFAULT 1,
+    error       TEXT,
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS webhook_deliveries_hook_idx ON webhook_deliveries (webhook_id, created_at);
+
+CREATE TABLE IF NOT EXISTS webhook_outbox (
+    id           TEXT PRIMARY KEY,
+    event_id     TEXT,
+    action       TEXT NOT NULL,
+    payload      TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    processed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS webhook_outbox_pending_idx ON webhook_outbox (processed_at, created_at);
