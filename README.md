@@ -2,6 +2,8 @@
 
 Self-hostable hackathon submission and judging platform for [DOGFOOD 2026](https://dogfoodhack.com). Python 3.12, FastAPI, SQLite, server-rendered gallery, JSON API for writes.
 
+**Submitting:** [SUBMISSION.md](SUBMISSION.md) lists required artefacts; [docs/demo-video-outline.md](docs/demo-video-outline.md) is a ~5 minute demo script.
+
 ## Requirement → artefact → test
 
 | Requirement | Artefact | How to verify |

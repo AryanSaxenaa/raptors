@@ -22,3 +22,26 @@ jobs:
         env:
           PYTHONPATH: src
       - run: test -f docs/openapi.json
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Start portal and run smoke
+        env:
+          DOGFOOD_DEV_TOKENS: "1"
+          PYTHONPATH: src
+        run: |
+          python -m dogfood init
+          python -m dogfood serve &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/api/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8080/api/health
+          python tests/smoke.py http://127.0.0.1:8080
