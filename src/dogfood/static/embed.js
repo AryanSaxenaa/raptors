@@ -9,6 +9,6 @@
   iframe.title = "Dogfood gallery";
   iframe.loading = "lazy";
   iframe.style.cssText =
-    "width:100%;max-width:960px;height:" + height + "px;border:1px solid #30363d;border-radius:8px;background:#0d1117";
+    "width:100%;max-width:960px;height:" + height + "px;border:1px solid #3a4a32;border-radius:2px;background:#10160e";
   script.parentNode.insertBefore(iframe, script.nextSibling);
 })();

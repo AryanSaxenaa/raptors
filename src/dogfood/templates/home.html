@@ -2,12 +2,20 @@
 {% block title %}Dogfood Portal{% endblock %}
 
 {% block body %}
-<h1>{{ event.name }}</h1>
-<p class="lede">
+<section class="hero">
+  <div>
+    <p class="kicker">Station log</p>
+    <h1>{{ event.name }}</h1>
+    <p class="lede">
   A self-hostable submission and judging portal, seeded with the published
   fixture data. Submissions closed at <code>{{ event.submissions_close }}</code>,
   so this event is read-only and the deadline is genuinely enforced.
-</p>
+    </p>
+  </div>
+  <div class="hero-art">
+    {% include "_raptor.html" %}
+  </div>
+</section>
 
 <div class="grid c4">
   <div class="stat"><div class="n">{{ counts.projects }}</div><div class="k">projects</div></div>

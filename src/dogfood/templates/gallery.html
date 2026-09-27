@@ -11,6 +11,7 @@
 #}
 
 {% block body %}
+<p class="kicker">Catalogue</p>
 <h1>Project gallery</h1>
 <p class="lede">
   {{ total }} submitted project{{ '' if total == 1 else 's' }}, in arrival order.
@@ -53,6 +54,7 @@
 <div class="cards">
   {% for p in projects %}
     <article class="card">
+      <p class="specimen-id" aria-hidden="true"><span>Specimen</span><span>{{ p.id }}</span></p>
       {% if p.thumbnail_url %}
         <p class="dim"><a href="{{ p.thumbnail_url }}" rel="nofollow noopener">thumbnail</a></p>
       {% endif %}
