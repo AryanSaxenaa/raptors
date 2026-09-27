@@ -2,6 +2,7 @@
 {% block title %}Community vote &middot; Dogfood Portal{% endblock %}
 
 {% block body %}
+<p class="kicker">Assembly</p>
 <h1>Community vote</h1>
 <p class="lede">
   Quadratic voting: spend up to <b>{{ credit_budget }}</b> credits across projects.
@@ -39,8 +40,7 @@ const eventId = {{ event.id | tojson }};
 
 function appendBallotRow(root, p, creditBudget) {
   const row = document.createElement('div');
-  row.style.borderTop = '1px solid var(--line)';
-  row.style.padding = '12px 0';
+  row.className = 'vote-row';
 
   const head = document.createElement('div');
   const link = document.createElement('a');
@@ -57,7 +57,7 @@ function appendBallotRow(root, p, creditBudget) {
   row.appendChild(head);
 
   const tag = document.createElement('div');
-  tag.className = 'dim';
+  tag.className = 'tagline';
   tag.textContent = p.tagline || '';
   row.appendChild(tag);
 
@@ -69,7 +69,7 @@ function appendBallotRow(root, p, creditBudget) {
   input.max = String(creditBudget);
   input.value = '1';
   input.dataset.project = p.id;
-  input.style.cssText = 'width:80px;margin-left:8px';
+  input.className = 'credits';
   label.appendChild(input);
   row.appendChild(label);
 
@@ -107,6 +107,7 @@ async function loadBallot() {
   const root = document.getElementById('ballot');
   root.replaceChildren();
   ballot.projects.forEach(p => appendBallotRow(root, p, ballot.credit_budget));
+  root.dataset.ready = '1';
 }
 
 loadBallot().catch(e => flash(e.message, 'bad'));

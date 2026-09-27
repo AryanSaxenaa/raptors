@@ -9,24 +9,43 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Dogfood Portal{% endblock %}</title>
+  <meta name="theme-color" content="#10160e">
+  <meta name="description" content="Dogfood Portal — a self-hosted field station for hackathon submissions, judging, and results.">
+  <meta property="og:title" content="Dogfood Portal">
+  <meta property="og:description" content="A self-hosted field station for hackathon submissions, judging, and results.">
+  <meta property="og:image" content="{{ settings.base_url }}/static/og.png">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="flora flora-left" aria-hidden="true"></div>
+<div class="flora flora-right" aria-hidden="true"></div>
 <header class="top">
   <div class="wrap bar">
-    <a class="brand" href="/">DOG<span>FOOD</span></a>
-    <nav>
-      <a href="/projects">Gallery</a>
-      <a href="/projects/new">Submit</a>
-      <a href="/teams">Teams</a>
-      <a href="/vote">Vote</a>
-      {% if is_judge %}<a href="/judge">Judge console</a>{% endif %}
-      {% if can_aggregate %}<a href="/organizer">Organizer</a>
-      <a href="/organizer/setup">Setup</a>
-      <a href="/organizer/results">Results</a>{% endif %}
-      {% if can_audit %}<a href="/organizer/audit">Audit</a>{% endif %}
-      <a href="/docs">API</a>
-    </nav>
+    <a class="brand" href="/">
+      <img src="/static/mark.svg" width="40" height="40" alt="">
+      <span>
+        <span class="brand-word">DOG<span>FOOD</span></span>
+        <span class="brand-sub">Field station</span>
+      </span>
+    </a>
+    <details class="menu">
+      <summary>Menu</summary>
+      <nav aria-label="Primary">
+        <a href="/projects">Gallery</a>
+        <a href="/projects/new">Submit</a>
+        <a href="/teams">Teams</a>
+        <a href="/vote">Vote</a>
+        {% if is_judge %}<a href="/judge">Judge console</a>{% endif %}
+        {% if can_aggregate %}<a href="/organizer">Organizer</a>
+        <a href="/organizer/setup">Setup</a>
+        <a href="/organizer/results">Results</a>{% endif %}
+        {% if can_audit %}<a href="/organizer/audit">Audit</a>{% endif %}
+        <a href="/docs">API</a>
+      </nav>
+    </details>
     <div class="who">
       {% if who.is_anonymous %}
         not signed in &middot; <a href="/login">sign in</a>
@@ -37,7 +56,7 @@
   </div>
 </header>
 
-<main class="wrap">
+<main class="wrap" id="content">
   {% block body %}{% endblock %}
 </main>
 
@@ -79,6 +98,7 @@ function flash(message, kind) {
   el.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 }
 </script>
+<script src="/static/theme.js" defer></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

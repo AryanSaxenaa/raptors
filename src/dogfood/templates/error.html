@@ -12,16 +12,44 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ problem.status }} {{ problem.title }} &middot; Dogfood Portal</title>
+  <meta name="theme-color" content="#10160e">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="flora flora-left" aria-hidden="true"></div>
+<div class="flora flora-right" aria-hidden="true"></div>
 <header class="top"><div class="wrap bar">
-  <a class="brand" href="/">DOG<span>FOOD</span></a>
-  <nav><a href="/projects">Gallery</a><a href="/login">Sign in</a></nav>
+  <a class="brand" href="/">
+    <img src="/static/mark.svg" width="40" height="40" alt="">
+    <span>
+      <span class="brand-word">DOG<span>FOOD</span></span>
+      <span class="brand-sub">Field station</span>
+    </span>
+  </a>
+  <details class="menu">
+    <summary>Menu</summary>
+    <nav aria-label="Primary"><a href="/projects">Gallery</a><a href="/login">Sign in</a></nav>
+  </details>
 </div></header>
 
-<main class="wrap">
+<main class="wrap" id="content">
+  {% if problem.status == 404 %}
+  <section class="hero lost">
+    <div>
+      <p class="kicker">Trail ends</p>
+      <h1>{{ problem.status }} &middot; {{ problem.title }}</h1>
+      <p class="lede">This specimen is not in the field catalogue. The station log below is the same reason a client receives.</p>
+    </div>
+    <div class="hero-art">
+      {% include "_raptor.html" %}
+    </div>
+  </section>
+  {% else %}
+  <p class="kicker">Station notice</p>
   <h1>{{ problem.status }} &middot; {{ problem.title }}</h1>
+  {% endif %}
   <div class="panel">
     <p class="lede">{{ problem.detail }}</p>
     <table><tbody>
@@ -61,6 +89,12 @@
         Results are held until the organizer publishes them. The embargo is
         enforced at the API, so the leaderboard is not merely hidden in the UI.
       </p>
+    {% elif problem.status == 404 %}
+      <p class="sum">
+        The path is not on the station map.
+        <a href="/projects">Return to the catalogue</a> or
+        <a href="/">the station log</a>.
+      </p>
     {% endif %}
 
     <p style="margin-top:18px">
@@ -75,5 +109,6 @@
     <code>code</code>.
   </p>
 </main>
+<script src="/static/theme.js" defer></script>
 </body>
 </html>
