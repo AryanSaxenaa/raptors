@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 220 48" aria-label="Raptors">
+  <defs>
+    <path id="arc" d="M 8 38 Q 110 4 212 38" fill="none"/>
+  </defs>
+  <text font-family="Arial Black, Helvetica Neue, Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="0.14em" fill="#0a0a0a">
+    <textPath href="#arc" xlink:href="#arc" startOffset="50%" text-anchor="middle">RAPTORS</textPath>
+  </text>
+</svg>

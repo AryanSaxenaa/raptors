@@ -8,19 +8,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Dogfood Portal{% endblock %}</title>
-  <link rel="stylesheet" href="/static/app.css">
+  <title>{% block title %}Raptors{% endblock %}</title>
+  <link rel="stylesheet" href="{{ static_url('app.css') }}">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 <header class="top">
   <div class="wrap bar">
-    <a class="brand" href="/">DOG<span>FOOD</span></a>
+    <a class="brand" href="/" aria-label="Raptors home">
+      <img src="{{ static_url('logo-raptors.svg') }}" alt="Raptors" width="160" height="36">
+    </a>
     <nav>
       <a href="/projects">Gallery</a>
       <a href="/projects/new">Submit</a>
       <a href="/teams">Teams</a>
       <a href="/vote">Vote</a>
-      {% if is_judge %}<a href="/judge">Judge console</a>{% endif %}
+      {% if is_judge %}<a href="/judge">Judge</a>{% endif %}
       {% if can_aggregate %}<a href="/organizer">Organizer</a>
       <a href="/organizer/setup">Setup</a>
       <a href="/organizer/results">Results</a>{% endif %}
@@ -29,7 +31,7 @@
     </nav>
     <div class="who">
       {% if who.is_anonymous %}
-        not signed in &middot; <a href="/login">sign in</a>
+        guest &middot; <a href="/login">sign in</a>
       {% else %}
         {{ who.name }} &middot; <b>{{ who.role }}</b> &middot; <a href="/login">switch</a>
       {% endif %}
@@ -37,21 +39,21 @@
   </div>
 </header>
 
+{% block hero %}{% endblock %}
+
 <main class="wrap">
   {% block body %}{% endblock %}
 </main>
 
 <footer class="foot wrap">
-  Dogfood Portal &middot; open source, self-hosted, no external services &middot;
+  Raptors &middot; DOGFOOD 2026 judging portal &middot; self-hosted &middot;
   <a href="/openapi.json">OpenAPI</a> &middot;
   <a href="/api/health">health</a> &middot;
-  <a href="/embed/gallery">embed gallery</a> &middot;
-  <a href="/api/auth/matrix">role matrix</a>
+  <a href="/embed/gallery">embed</a> &middot;
+  <a href="/api/auth/matrix">roles</a>
 </footer>
 
 <script>
-// Every write in this UI goes through the same JSON API an external client
-// would use. There is no form-post path with extra privileges.
 async function api(method, url, body) {
   const res = await fetch(url, {
     method,

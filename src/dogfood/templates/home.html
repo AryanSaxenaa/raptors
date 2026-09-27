@@ -1,20 +1,87 @@
 {% extends "base.html" %}
-{% block title %}Dogfood Portal{% endblock %}
+{% block body_class %}page-home{% endblock %}
+{% block title %}Raptors &middot; {{ event.name }}{% endblock %}
+
+{% block hero %}
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero__stage">
+    <h1 id="hero-title" class="hero__title">
+      <span class="hero__title-lead">Great judging.</span>
+      <span class="hero__title-bite">No nonsense.</span>
+    </h1>
+    <div id="hero-raptor" class="hero__raptor" data-lottie="{{ static_url('raptor-hero.lottie.json') }}" data-fallback="{{ static_url('raptor-hero.svg') }}" aria-hidden="true"></div>
+  </div>
+  <p class="hero__sub">
+    {{ event.name }} &mdash; self-hosted portal for submissions, isolation, and
+    calibrated scores. Seeded with the official fixtures so judges compare software, not demo data.
+  </p>
+  <div class="hero__actions">
+    <a class="btn" href="/projects">Browse gallery</a>
+    <a class="btn ghost" href="/docs">OpenAPI</a>
+    <a class="btn ghost" href="/login">Sign in</a>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ static_url('lottie.min.js') }}"></script>
+<script>
+(function () {
+  var hero = document.querySelector('.hero');
+  var box = document.getElementById('hero-raptor');
+  if (!box) return;
+  var fallback = box.getAttribute('data-fallback');
+  function showFallback() {
+    if (hero) hero.classList.remove('hero--lottie-ready');
+    box.innerHTML = '<img src="' + fallback + '" alt="" width="520" height="640" style="width:100%;height:100%;object-fit:contain">';
+  }
+  function start() {
+    if (!window.lottie) {
+      showFallback();
+      return;
+    }
+    try {
+      var anim = window.lottie.loadAnimation({
+        container: box,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        path: box.getAttribute('data-lottie'),
+        rendererSettings: {
+          preserveAspectRatio: 'xMidYMid meet',
+          viewBoxOnly: true,
+        },
+      });
+      anim.addEventListener('DOMLoaded', function () {
+        if (hero) hero.classList.add('hero--lottie-ready');
+      });
+      anim.addEventListener('data_failed', showFallback);
+    } catch (e) {
+      showFallback();
+    }
+  }
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load('700 100px Lora-Bold').then(start, start);
+  } else {
+    start();
+  }
+})();
+</script>
+{% endblock %}
 
 {% block body %}
-<h1>{{ event.name }}</h1>
-<p class="lede">
-  A self-hostable submission and judging portal, seeded with the published
-  fixture data. Submissions closed at <code>{{ event.submissions_close }}</code>,
-  so this event is read-only and the deadline is genuinely enforced.
-</p>
-
+<p class="section-label">At a glance</p>
 <div class="grid c4">
   <div class="stat"><div class="n">{{ counts.projects }}</div><div class="k">projects</div></div>
   <div class="stat"><div class="n">{{ counts.judges }}</div><div class="k">judges</div></div>
   <div class="stat"><div class="n">{{ counts.scores }}</div><div class="k">ballots cast</div></div>
   <div class="stat"><div class="n">{{ counts.tracks }}</div><div class="k">tracks</div></div>
 </div>
+
+<p class="lede" style="margin-top:28px">
+  Submissions closed at <code>{{ event.submissions_close }}</code> on the fixture event.
+  The deadline is enforced in the API before validation runs.
+</p>
 
 {% if duplicates %}
   <h2>Flagged on import</h2>

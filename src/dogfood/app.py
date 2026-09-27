@@ -150,6 +150,14 @@ def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) ->
     app.state.templates = Jinja2Templates(directory=str(config.templates_dir))
     app.state.templates.env.globals["settings"] = config
 
+    def static_url(name: str) -> str:
+        path = config.static_dir / name
+        if path.is_file():
+            return f"/static/{name}?v={int(path.stat().st_mtime)}"
+        return f"/static/{name}"
+
+    app.state.templates.env.globals["static_url"] = static_url
+
     install_error_handlers(app, app.state.templates)
 
     @app.middleware("http")

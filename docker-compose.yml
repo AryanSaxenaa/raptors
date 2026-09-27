@@ -8,6 +8,8 @@ services:
       DOGFOOD_DB: /data/dogfood.sqlite3
     volumes:
       - dogfood_data:/data
+      # Live-mount source so template/CSS edits show up without rebuilding the image.
+      - ./src:/app/src:ro
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
       interval: 15s
