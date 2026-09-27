@@ -1,0 +1,109 @@
+﻿DOGFOOD 2026 -- cross-judge normalization proof
+==============================================================================
+
+observations        126
+projects            41  (1 excluded from ranking as duplicates)
+judges              30
+rubric weights      {"functionality": 1.0, "innovation": 1.0, "quality": 1.0}
+pooled mean / sd    3.5661 / 0.6483
+model               y_ij = mu + p_i + b_j, ridge ALS, lambda_p=1.0, lambda_b=3.0, k=5.0
+convergence         24 iterations, converged=True, residual sd=0.4873
+
+BETWEEN-JUDGE SPREAD (the dispersion of judge average scores)
+  raw, uncalibrated        sigma = 0.4127
+  after calibration        sigma = 0.2449
+  reduction                40.7%
+
+PER-JUDGE DIAGNOSTICS
+  judge     n   mean     sd   sd~    scale    bias   cal.mean  note
+  --------------------------------------------------------------------------
+  jdg_02     6  4.222  0.737  0.70   0.930   0.168     3.675  Wei Lindqvist
+  jdg_30     4  4.083  0.493  0.58   1.119   0.092     3.796  Rafa Okonkwo
+  jdg_15     6  4.056  0.756  0.71   0.917   0.137     3.633  Yuki Sato
+  jdg_07     3  4.000  0.000  0.41   1.600   0.204     3.796  FLAT: zero variance, no discriminative weight
+  jdg_13     3  4.000  0.544  0.61   1.064   0.167     3.688  Rosa Moreau
+  jdg_03     2  3.833  0.500  0.61   1.070   0.117     3.653  Priya Nair
+  jdg_22     5  3.733  0.680  0.66   0.976   0.024     3.624  Felix Roth
+  jdg_26    10  3.700  0.458  0.52   1.243   0.106     3.516  Jonas Vogel
+  jdg_21     4  3.667  0.707  0.67   0.961   0.058     3.562  Sana Aziz
+  jdg_11     6  3.611  0.705  0.68   0.954   0.032     3.554  Amara Silva
+  jdg_16     6  3.611  0.705  0.68   0.954  -0.006     3.592  Nadia Rahman
+  jdg_04     4  3.583  0.640  0.64   1.006  -0.064     3.639  Noor Haddad
+  jdg_29     9  3.519  0.388  0.48   1.347  -0.023     3.566  Ines Rocha
+  jdg_05     2  3.500  0.167  0.51   1.269   0.049     3.457  Kofi Mensah
+  jdg_12     2  3.500  0.500  0.61   1.070   0.018     3.498  Dilan Yilmaz
+  jdg_17     2  3.500  0.167  0.51   1.269   0.057     3.449  Bruno Costa
+  jdg_09     5  3.467  0.499  0.57   1.130  -0.010     3.520  Sofia Duarte
+  jdg_25     5  3.467  0.400  0.52   1.237  -0.099     3.604  Thandi Dlamini
+  jdg_06     3  3.444  0.416  0.56   1.155   0.063     3.416  Lena Kovac
+  jdg_08     3  3.444  0.685  0.66   0.979  -0.104     3.595  Marek Nowak
+  jdg_18     3  3.444  0.157  0.46   1.397  -0.078     3.538  Lars Berg
+  jdg_24    11  3.364  0.594  0.61   1.061  -0.015     3.514  Diego Herrera
+  jdg_19     4  3.333  0.577  0.62   1.051  -0.065     3.495  Mira Kaur
+  jdg_23     1  3.333  0.000  0.54   1.200  -0.090     3.423  single ballot: only 25% of the residual is attributed to bias
+  jdg_10     3  3.222  0.416  0.56   1.155  -0.210     3.528  Hiro Tanaka
+  jdg_28     2  3.167  0.167  0.51   1.269  -0.069     3.273  Pavel Ivanov
+  jdg_20     6  3.111  0.737  0.70   0.930  -0.060     3.434  Otto Brandt
+  jdg_14     3  3.000  0.544  0.61   1.064  -0.134     3.324  Emeka Adeyemi
+  jdg_27     2  3.000  0.333  0.56   1.161  -0.204     3.301  Leila Nasser
+  jdg_01     1  2.000  0.000  0.54   1.200  -0.362     2.362  single ballot: only 25% of the residual is attributed to bias
+
+PROJECT SCORES: raw -> normalized, with rank movement
+  project   title                 n   raw    z~     norm    se    rank  ->  rank   d
+  --------------------------------------------------------------------------------------
+  prj_34    Iron Switch           3    4.33   4.34   4.135  0.281     2  ->     1   +1
+  prj_11    Salt Ledger           4    4.33   4.22   4.055  0.244     1  ->     2   -1
+  prj_37    Salt Loom             4    4.08   4.08   3.985  0.244     5  ->     3   +2
+  prj_33    Slow Trail            3    4.00   4.09   3.942  0.281     7  ->     4   +3
+  prj_25    Dry Relay             3    4.11   4.05   3.930  0.281     4  ->     5   -1
+  prj_16    Salt Kiln             3    4.00   3.94   3.886  0.281     6  ->     6   +0
+  prj_10    Still Beacon          2 !  4.17   4.04   3.842  0.345     3  ->     7   -4
+  prj_21    Copper Kiln           3    3.89   3.77   3.706  0.281     8  ->     8   +0
+  prj_08    North Drift           5    3.80   3.70   3.693  0.218     9  ->     9   +0
+  prj_04    Green Switch          3    3.78   3.73   3.689  0.281    10  ->    10   +0
+  prj_38    Deep Beacon           3    3.78   3.70   3.672  0.281    11  ->    11   +0
+  prj_15    Copper Orbit          2 !  3.67   3.65   3.637  0.345    12  ->    12   +0
+  prj_09    Hollow Signal         3    3.56   3.63   3.623  0.281    16  ->    13   +3
+  prj_36    Salt Drift            3    3.67   3.63   3.604  0.281    14  ->    14   +0
+  prj_24    Glass Beacon          2 !  3.50   3.54   3.598  0.345    20  ->    15   +5
+  prj_17    Small Loom            3    3.56   3.59   3.592  0.281    17  ->    16   +1
+  prj_18    Open Kiln             2 !  3.50   3.54   3.578  0.345    19  ->    17   +2
+  prj_31    Salt Ferry            3    3.56   3.61   3.576  0.281    18  ->    18   +0
+  prj_19    Small Relay           2 !  3.67   3.65   3.559  0.345    13  ->    19   -6
+  prj_12    Open Beacon           3    3.44   3.51   3.556  0.281    24  ->    20   +4
+  prj_27    Flat Thread           3    3.44   3.53   3.523  0.281    25  ->    21   +4
+  prj_01    Glass Signal          3    3.44   3.48   3.518  0.281    23  ->    22   +1
+  prj_14    Green Lantern         5    3.40   3.45   3.497  0.218    28  ->    23   +5
+  prj_02    Small Meadow          3    3.56   3.53   3.495  0.281    15  ->    24   -9
+  prj_39    Paper Anchor          2 !  3.50   3.47   3.491  0.345    21  ->    25   -4
+  prj_29    Flat Relay            2 !  3.33   3.44   3.488  0.345    32  ->    26   +6
+  prj_07    Dry Harbour           5    3.33   3.37   3.447  0.218    30  ->    27   +3
+  prj_32    Loud Ledger           3    3.44   3.43   3.443  0.281    27  ->    28   -1
+  prj_35    Warm Beacon           5    3.47   3.47   3.436  0.218    22  ->    29   -7
+  prj_03    Deep Compass          3    3.33   3.34   3.372  0.281    29  ->    30   -1
+  prj_13    Quiet Anchor          3    3.33   3.30   3.330  0.281    31  ->    31   +0
+  prj_30    Paper Harbour         3    3.11   3.20   3.320  0.281    37  ->    32   +5
+  prj_26    Amber Hours           3    3.22   3.25   3.292  0.281    34  ->    33   +1
+  prj_20    Paper Thread          3    3.22   3.17   3.258  0.281    33  ->    34   -1
+  prj_28    Flat Meadow           3    3.44   3.23   3.252  0.281    26  ->    35   -9
+  prj_22    Dry Bridge            3    3.11   3.14   3.234  0.281    36  ->    36   +0
+  prj_06    Dry Compass           3    3.11   3.08   3.181  0.281    35  ->    37   -2
+  prj_40    Slow Loom             2 !  3.00   2.96   3.133  0.345    38  ->    38   +0
+  prj_23    Slow Quarry           3    2.89   2.87   3.027  0.281    40  ->    39   +1
+  prj_05    North Compass         3    2.89   2.77   2.955  0.281    39  ->    40   -1
+
+  ! = fewer than 3 reviews, reported but flagged low confidence
+
+EXCLUDED FROM RANKING (duplicate submissions)
+  prj_41    Dry Harbour          n=4  raw= 3.83  norm= 3.758   ballots retained for judge calibration
+
+LARGEST RANK MOVEMENTS
+   -9 down prj_02    Small Meadow             raw rank 15 -> 24
+   -9 down prj_28    Flat Meadow              raw rank 26 -> 35
+   -7 down prj_35    Warm Beacon              raw rank 22 -> 29
+   -6 down prj_19    Small Relay              raw rank 13 -> 19
+   +6 up   prj_29    Flat Relay               raw rank 32 -> 26
+   +5 up   prj_14    Green Lantern            raw rank 28 -> 23
+   +5 up   prj_24    Glass Beacon             raw rank 20 -> 15
+   +5 up   prj_30    Paper Harbour            raw rank 37 -> 32
+

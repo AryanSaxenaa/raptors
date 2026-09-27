@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Audit trail &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>Audit trail</h1>
+<p class="lede">
+  Append-only and hash-chained: each entry's hash covers the previous entry's
+  hash, so a deleted or edited row breaks verification at that point instead of
+  disappearing quietly.
+</p>
+
+<div class="panel">
+  {% if chain.ok %}
+    <div class="notice ok">
+      Chain verified over {{ chain.entries }} entries. Head
+      <span class="mono">{{ chain.head_hash[:16] }}&hellip;</span>
+    </div>
+  {% else %}
+    <div class="notice bad">
+      Chain broken at sequence {{ chain.broken_at_seq }}. Expected
+      <span class="mono">{{ chain.expected_entry_hash[:16] }}&hellip;</span>,
+      stored <span class="mono">{{ chain.stored_entry_hash[:16] }}&hellip;</span>
+    </div>
+  {% endif %}
+  <p class="sum">
+    Verification is a live recomputation, not a stored flag:
+    <a href="/api/audit/verify">/api/audit/verify</a> rehashes every row on each
+    call. A judge's participation record
+    (<code>/api/judges/{id}/record</code>) is signed against this head hash, so
+    it is checkable after the event without trusting the organizer.
+  </p>
+</div>
+
+<form class="panel" method="get" action="/organizer/audit"
+      style="display:flex; gap:12px; align-items:flex-end">
+  <div style="flex:1">
+    <label for="action">Action</label>
+    <select id="action" name="action" onchange="this.form.submit()">
+      <option value="">All actions</option>
+      {% for a in actions %}
+        <option value="{{ a }}" {% if action_filter == a %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="flex:0 0 auto">
+    <a class="btn ghost" href="/organizer/audit?action=authorization.denied">Show denials</a>
+    <a class="btn ghost" href="/api/exports/audit.csv">audit.csv</a>
+  </div>
+</form>
+
+<div class="panel scroll">
+  <table>
+    <thead><tr>
+      <th class="num">seq</th><th>when</th><th>actor</th><th>action</th>
+      <th>target</th><th>reason</th><th>detail</th><th>hash</th>
+    </tr></thead>
+    <tbody>
+      {% for e in entries %}
+        <tr>
+          <td class="num">{{ e.seq }}</td>
+          <td class="mono dim">{{ e.at }}</td>
+          <td>
+            {{ e.actor_user_id or 'anonymous' }}
+            {% if e.actor_role %}<span class="badge">{{ e.actor_role }}</span>{% endif %}
+          </td>
+          <td>
+            {% if e.action == 'authorization_denied' %}
+              <span class="badge bad">{{ e.action }}</span>
+            {% else %}{{ e.action }}{% endif %}
+          </td>
+          <td class="mono dim">{{ e.target_type or '' }}{% if e.target_id %}:{{ e.target_id }}{% endif %}</td>
+          <td class="mono">{{ e.reason_code or '' }}</td>
+          <td class="dim mono" style="max-width:340px; overflow:hidden; text-overflow:ellipsis">
+            {{ e.detail | tojson }}
+          </td>
+          <td class="mono dim">{{ e.entry_hash[:10] }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h3>Try it</h3>
+  <p class="sum">
+    Run the acceptance suite, then filter this page by
+    <code>authorization.denied</code>. The isolation check the suite performs
+    &mdash; judge B requesting judge A's ballots &mdash; is a row here, naming the
+    actor, the capability they lacked and the reason code. The refusal is the
+    record; nothing has to be inferred from a web server log.
+  </p>
+</div>
+{% endblock %}

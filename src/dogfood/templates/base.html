@@ -1,0 +1,80 @@
+{#
+  Read views render here on the server; writes go through the JSON API via
+  api() below. One write surface, so the UI cannot do anything an API client
+  cannot.
+#}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Dogfood Portal{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="/">DOG<span>FOOD</span></a>
+    <nav>
+      <a href="/projects">Gallery</a>
+      <a href="/projects/new">Submit</a>
+      {% if is_judge %}<a href="/judge">Judge console</a>{% endif %}
+      {% if can_aggregate %}<a href="/organizer">Organizer</a>
+      <a href="/organizer/results">Results</a>{% endif %}
+      {% if can_audit %}<a href="/organizer/audit">Audit</a>{% endif %}
+      <a href="/docs">API</a>
+    </nav>
+    <div class="who">
+      {% if who.is_anonymous %}
+        not signed in &middot; <a href="/login">sign in</a>
+      {% else %}
+        {{ who.name }} &middot; <b>{{ who.role }}</b> &middot; <a href="/login">switch</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  {% block body %}{% endblock %}
+</main>
+
+<footer class="foot wrap">
+  Dogfood Portal &middot; open source, self-hosted, no external services &middot;
+  <a href="/openapi.json">OpenAPI</a> &middot;
+  <a href="/api/health">health</a> &middot;
+  <a href="/api/auth/matrix">role matrix</a>
+</footer>
+
+<script>
+// Every write in this UI goes through the same JSON API an external client
+// would use. There is no form-post path with extra privileges.
+async function api(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? {'Content-Type': 'application/json'} : {},
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: 'same-origin',
+  });
+  let payload = null;
+  try { payload = await res.json(); } catch (e) { /* empty body is fine */ }
+  if (!res.ok) {
+    const err = new Error((payload && (payload.detail || payload.title)) || res.statusText);
+    err.problem = payload;
+    err.status = res.status;
+    throw err;
+  }
+  return payload;
+}
+
+function flash(message, kind) {
+  const el = document.getElementById('flash');
+  if (!el) { alert(message); return; }
+  el.className = 'notice ' + (kind || 'ok');
+  el.textContent = message;
+  el.hidden = false;
+  el.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

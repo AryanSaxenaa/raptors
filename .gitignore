@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.sqlite3
+*.sqlite3-*
+var/
+dogfood.db
+dogfood.db-*
+server.log
+server.err
+.env
+.env.local
+*.egg-info/
+dist/
+build/

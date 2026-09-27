@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Score {{ project.title }} &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>{{ project.title }}</h1>
+<p class="lede">{{ project.tagline }}</p>
+
+<div class="grid c2">
+  <div class="panel">
+    <h3>The submission</h3>
+    <table><tbody>
+      <tr><th>Project</th><td class="mono">{{ project.id }}</td></tr>
+      <tr><th>Track</th><td class="mono">{{ project.track_id or '-' }}</td></tr>
+      <tr><th>Repository</th><td>
+        {% if project.repo_url %}<a href="{{ project.repo_url }}" rel="nofollow noopener">{{ project.repo_url }}</a>
+        {% else %}<span class="dim">-</span>{% endif %}</td></tr>
+      <tr><th>Live</th><td>
+        {% if project.live_url %}<a href="{{ project.live_url }}" rel="nofollow noopener">{{ project.live_url }}</a>
+        {% else %}<span class="dim">-</span>{% endif %}</td></tr>
+      <tr><th>Video</th><td>
+        {% if project.video_url %}<a href="{{ project.video_url }}" rel="nofollow noopener">{{ project.video_url }}</a>
+        {% else %}<span class="dim">-</span>{% endif %}</td></tr>
+    </tbody></table>
+    {% if project.description %}<p class="sum" style="margin-top:14px">{{ project.description }}</p>{% endif %}
+  </div>
+
+  <div class="panel">
+    <h3>Your ballot</h3>
+    <div id="flash" class="notice" hidden></div>
+
+    {% if your_ballot %}
+      <div class="notice">
+        You scored this on {{ your_ballot.submitted_at }}. Saving again revises it,
+        and the audit log keeps both the before and the after.
+      </div>
+    {% endif %}
+
+    <form id="ballot" onsubmit="return false">
+      {% for c in rubric %}
+        <div class="criterion">
+          <div class="head">
+            <strong>{{ c.label }}</strong>
+            {# Weights are data, not constants: the organizer sets them per
+               event, which is the thing the market leader cannot do. #}
+            <span class="badge">weight {{ c.weight }}</span>
+          </div>
+          {% if c.description %}<div class="dim" style="font-size:13px">{{ c.description }}</div>{% endif %}
+          <div class="scale">
+            {% for value in range(c.min_value, c.max_value + 1) %}
+              <label>
+                <input type="radio" name="{{ c.key }}" value="{{ value }}"
+                  {% if your_ballot and your_ballot.criteria.get(c.key) == value %}checked{% endif %}>
+                <span>{{ value }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+
+      <label for="comment">Written feedback <span class="dim">(optional)</span></label>
+      <textarea id="comment">{{ your_ballot.comment if your_ballot else '' }}</textarea>
+
+      <div style="margin-top:18px; display:flex; gap:10px">
+        <button id="save">{{ 'Revise ballot' if your_ballot else 'Save ballot' }}</button>
+        <a class="btn ghost" href="/judge">Back to queue</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const KEYS = {{ rubric | map(attribute='key') | list | tojson }};
+
+document.getElementById('save').addEventListener('click', async () => {
+  const criteria = {};
+  for (const key of KEYS) {
+    const picked = document.querySelector(`input[name="${key}"]:checked`);
+    if (!picked) { flash('Score every criterion before saving: ' + key, 'warn'); return; }
+    criteria[key] = Number(picked.value);
+  }
+  try {
+    await api('POST', '/api/judge/scores', {
+      project_id: '{{ project.id }}',
+      event_id: '{{ event_id }}',
+      criteria,
+      comment: document.getElementById('comment').value,
+    });
+    location.href = '/judge';
+  } catch (e) {
+    const code = e.problem && e.problem.code ? ' [' + e.problem.code + ']' : '';
+    flash(e.message + code, 'bad');
+  }
+});
+</script>
+{% endblock %}

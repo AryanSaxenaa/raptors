@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Gallery &middot; Dogfood Portal{% endblock %}
+
+{#
+  Rendered on the server. The acceptance suite fetches this page with no auth
+  header and greps the response body for fixture project titles, so the titles
+  have to be in these bytes -- not fetched by script after load.
+
+  Default order is arrival order and the page size is 200 against 41 fixture
+  projects, so page one is the whole event.
+#}
+
+{% block body %}
+<h1>Project gallery</h1>
+<p class="lede">
+  {{ total }} submitted project{{ '' if total == 1 else 's' }}, in arrival order.
+  Public: no sign-in required.
+</p>
+
+<form class="panel" method="get" action="/projects">
+  <div class="row">
+    <div>
+      <label for="q">Search</label>
+      <input type="text" id="q" name="q" value="{{ filters.q }}"
+             placeholder="title, summary or description">
+    </div>
+    <div>
+      <label for="track">Track</label>
+      <select id="track" name="track">
+        <option value="">All tracks</option>
+        {% for t in tracks %}
+          <option value="{{ t.id }}" {% if filters.track == t.id %}selected{% endif %}>
+            {{ t.name }} ({{ t.n }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="tag">Tech tag</label>
+      <input type="text" id="tag" name="tag" value="{{ filters.tag }}" placeholder="e.g. python">
+    </div>
+    <div style="flex:0 0 auto; display:flex; align-items:flex-end; gap:8px">
+      <button type="submit">Filter</button>
+      <a class="btn ghost" href="/projects">Reset</a>
+    </div>
+  </div>
+</form>
+
+{% if not projects %}
+  <div class="notice warn">No projects match that filter.</div>
+{% endif %}
+
+<div class="cards">
+  {% for p in projects %}
+    <article class="card">
+      <h4><a href="/projects/{{ p.id }}">{{ p.title }}</a></h4>
+      <p class="sum">{{ p.summary }}</p>
+      <div class="meta">
+        {{ p.id }} &middot; {{ p.team or 'unknown team' }} &middot; {{ p.track or 'no track' }}
+      </div>
+      <div class="tags">
+        {% if p.is_duplicate %}
+          {# Flagged by the importer, shown rather than hidden: an organizer
+             needs to see it, and dropping it would lose data. #}
+          <span class="badge warn" title="Duplicate of {{ p.duplicate_of }}">possible duplicate</span>
+        {% endif %}
+        {% for tag in p.tech_tags %}<span class="badge">{{ tag }}</span>{% endfor %}
+        {% if p.repo_url %}<a class="badge" href="{{ p.repo_url }}" rel="nofollow noopener">repo</a>{% endif %}
+        {% if p.live_url %}<a class="badge" href="{{ p.live_url }}" rel="nofollow noopener">demo</a>{% endif %}
+      </div>
+    </article>
+  {% endfor %}
+</div>
+
+{% if total > page_size %}
+  <div class="panel" style="margin-top:18px; display:flex; gap:12px; align-items:center">
+    <span class="dim">page {{ page }} of {{ (total // page_size) + 1 }}</span>
+    {% if page > 1 %}<a class="btn ghost" href="?page={{ page - 1 }}">Previous</a>{% endif %}
+    {% if page * page_size < total %}<a class="btn ghost" href="?page={{ page + 1 }}">Next</a>{% endif %}
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>{{ event.name }}</h1>
+<p class="lede">
+  A self-hostable submission and judging portal, seeded with the published
+  fixture data. Submissions closed at <code>{{ event.submissions_close }}</code>,
+  so this event is read-only and the deadline is genuinely enforced.
+</p>
+
+<div class="grid c4">
+  <div class="stat"><div class="n">{{ counts.projects }}</div><div class="k">projects</div></div>
+  <div class="stat"><div class="n">{{ counts.judges }}</div><div class="k">judges</div></div>
+  <div class="stat"><div class="n">{{ counts.scores }}</div><div class="k">ballots cast</div></div>
+  <div class="stat"><div class="n">{{ counts.tracks }}</div><div class="k">tracks</div></div>
+</div>
+
+{% if duplicates %}
+  <h2>Flagged on import</h2>
+  <div class="panel">
+    <p class="sum">
+      The importer detected a re-submission of the same work by the same team and
+      annotated it rather than dropping it. Nothing was discarded, and the
+      duplicate's ballots stay in the judge-calibration data.
+    </p>
+    <div class="scroll"><table>
+      <thead><tr>
+        <th>Duplicate</th><th>Of</th><th>Signal</th>
+        <th class="num">Reviews on duplicate</th><th class="num">Reviews on original</th>
+        <th>Judges who reviewed both</th>
+      </tr></thead>
+      <tbody>
+        {% for d in duplicates %}
+          <tr>
+            <td><a href="/projects/{{ d.project_id }}">{{ d.project_id }}</a> {{ d.title }}</td>
+            <td><a href="/projects/{{ d.duplicate_of }}">{{ d.duplicate_of }}</a></td>
+            <td class="dim">{{ d.reason }}</td>
+            <td class="num">{{ d.reviews_on_duplicate }}</td>
+            <td class="num">{{ d.reviews_on_original }}</td>
+            <td class="mono">{{ d.judges_who_reviewed_both | join(', ') or '-' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+{% endif %}
+
+<h2>Where to look</h2>
+<div class="grid c2">
+  <div class="panel">
+    <h3>For a reviewer</h3>
+    <ul>
+      <li><a href="/projects">Public gallery</a> with search and track filters, rendered server-side.</li>
+      <li><a href="/api/auth/matrix">The role-isolation matrix as served</a> &mdash; compare it with the
+          published figure.</li>
+      <li><a href="/organizer/audit">Audit trail</a> (organizer) &mdash; authorisation denials appear
+          here, including the one the acceptance suite provokes.</li>
+      <li><a href="/organizer/results">Normalized results</a> (organizer) &mdash; raw against
+          calibrated, with rank movement.</li>
+      <li><a href="/docs">OpenAPI browser</a> &mdash; every action the UI performs.</li>
+    </ul>
+  </div>
+  <div class="panel">
+    <h3>Events</h3>
+    <div class="scroll"><table>
+      <thead><tr><th>Event</th><th>Submissions close</th><th></th></tr></thead>
+      <tbody>
+      {% for e in events %}
+        <tr>
+          <td>{{ e.name }} <span class="dim mono">{{ e.id }}</span></td>
+          <td class="mono">{{ e.submissions_close or 'open' }}</td>
+          <td>
+            {% if e.is_fixture %}<span class="badge">fixture data</span>
+            {% else %}<span class="badge ok">open for submissions</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <p class="sum" style="margin-top:10px">
+      The fixture event is closed, which is correct and is what the acceptance
+      suite checks. The second event exists so the submit, edit and deadline
+      lifecycle can actually be exercised; it holds no fixture data.
+    </p>
+  </div>
+</div>
+{% endblock %}

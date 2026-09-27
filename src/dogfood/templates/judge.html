@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Judge console &middot; Dogfood Portal{% endblock %}
+
+{#
+  Five hours to score thirty projects is a UX problem before it is anything
+  else, so the queue sorts unscored first and every row is one click from a
+  ballot.
+#}
+
+{% block body %}
+<h1>Judge console</h1>
+
+{% if not judge %}
+  <div class="notice warn">
+    You are signed in as <b>{{ who.role }}</b> but you are not a judge on this
+    event, so you have no review queue. The role matrix still grants you
+    <code>own_scores</code>; there is simply nothing in it.
+  </div>
+{% else %}
+  <p class="lede">
+    {{ judge.display_name }} &middot; tracks
+    <span class="mono">{{ tracks | join(', ') or 'none' }}</span>.
+    You can only see projects in your own tracks &mdash; that is enforced in the
+    backend, by <code>assert_track_visible</code>, not by this page.
+  </p>
+
+  {% set done = queue | selectattr('scored') | list | length %}
+  <div class="grid c3">
+    <div class="stat"><div class="n">{{ queue | length }}</div><div class="k">assigned</div></div>
+    <div class="stat"><div class="n">{{ done }}</div><div class="k">scored</div></div>
+    <div class="stat"><div class="n">{{ (queue | length) - done }}</div><div class="k">remaining</div></div>
+  </div>
+
+  {% if queue %}
+    <div class="bar-track" style="margin:16px 0">
+      <div class="bar-fill" style="width: {{ (100 * done / (queue | length)) | round(1) }}%"></div>
+    </div>
+  {% endif %}
+
+  <h2>Your queue</h2>
+  <div class="panel scroll">
+    <table>
+      <thead><tr>
+        <th>Project</th><th>Tagline</th><th>Track</th><th>Links</th><th></th>
+      </tr></thead>
+      <tbody>
+        {% for row in queue %}
+          <tr>
+            <td>
+              <a href="/judge/projects/{{ row.project_id }}">{{ row.title }}</a>
+              <div class="dim mono">{{ row.project_id }}</div>
+            </td>
+            <td class="dim">{{ row.tagline }}</td>
+            <td>{{ row.track_name or '-' }}</td>
+            <td>
+              {% if row.repo_url %}<a class="badge" href="{{ row.repo_url }}" rel="nofollow noopener">repo</a>{% endif %}
+              {% if row.live_url %}<a class="badge" href="{{ row.live_url }}" rel="nofollow noopener">demo</a>{% endif %}
+            </td>
+            <td>
+              {% if row.scored %}
+                <a class="btn ghost" href="/judge/projects/{{ row.project_id }}">Revise</a>
+              {% else %}
+                <a class="btn" href="/judge/projects/{{ row.project_id }}">Score</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>What you cannot see</h3>
+    <p class="sum">
+      Another judge's ballots, any project outside your tracks, the aggregate
+      leaderboard, and the audit log. Each of those is refused at the API with a
+      403 and a reason code, and the refusal is written to the audit trail. Try
+      it: <code>/api/judge/scores?judge=jdg_02</code>.
+    </p>
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Organizer &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>Organizer console</h1>
+<p class="lede">
+  {{ event.name }} &middot; <span class="mono">{{ event.id }}</span> &middot;
+  target {{ progress.reviews_per_project }} reviews per project.
+</p>
+
+<div id="flash" class="notice" hidden></div>
+
+<div class="grid c4">
+  <div class="stat">
+    <div class="n">{{ progress.percent_complete if progress.percent_complete is not none else '-' }}%</div>
+    <div class="k">reviews complete</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ progress.assignments_completed }}/{{ progress.assignments_total }}</div>
+    <div class="k">ballots in</div>
+  </div>
+  <div class="stat {% if progress.judges_not_started %}alarm{% endif %}">
+    <div class="n">{{ progress.judges_not_started }}</div>
+    <div class="k">judges not started</div>
+  </div>
+  <div class="stat {% if progress.under_reviewed %}alarm{% endif %}">
+    <div class="n">{{ progress.under_reviewed | length }}</div>
+    <div class="k">under-reviewed projects</div>
+  </div>
+</div>
+
+<h2>Coverage</h2>
+<div class="grid c2">
+  <div class="panel">
+    <h3>Reviews per project</h3>
+    <table>
+      <thead><tr><th>Reviews</th><th class="num">Projects</th><th></th></tr></thead>
+      <tbody>
+        {% for count, n in progress.reviews_per_project_histogram.items() %}
+          <tr>
+            <td class="num">{{ count }}</td>
+            <td class="num">{{ n }}</td>
+            <td>
+              {% if count < progress.reviews_per_project %}
+                <span class="badge warn">below target</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="sum" style="margin-top:10px">
+      An uneven histogram is a fairness problem: a project seen twice is ranked
+      against projects seen five times. The normalizer reports a standard error
+      per project so this stays visible in the results rather than being averaged
+      away.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h3>Track capacity</h3>
+    <table>
+      <thead><tr><th>Track</th><th class="num">Judges</th><th class="num">Projects</th>
+        <th class="num">Reviews needed</th><th></th></tr></thead>
+      <tbody>
+        {% for t in progress.track_capacity %}
+          <tr>
+            <td>{{ t.name }}<div class="dim mono">{{ t.track_id }}</div></td>
+            <td class="num">{{ t.judges }}</td>
+            <td class="num">{{ t.projects }}</td>
+            <td class="num">{{ t.reviews_needed }}</td>
+            <td>{% if t.note %}<span class="badge bad">{{ t.note }}</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if progress.under_reviewed %}
+  <h2>Needs attention</h2>
+  <div class="panel scroll">
+    <table>
+      <thead><tr><th>Project</th><th>Track</th><th class="num">Reviews</th>
+        <th class="num">Short by</th></tr></thead>
+      <tbody>
+        {% for p in progress.under_reviewed %}
+          <tr>
+            <td><a href="/projects/{{ p.project_id }}">{{ p.title }}</a>
+                <div class="dim mono">{{ p.project_id }}</div></td>
+            <td class="mono">{{ p.track_id or '-' }}</td>
+            <td class="num">{{ p.reviews }}</td>
+            <td class="num">{{ p.short_by }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top:14px">
+      <button id="assign">Top up assignments</button>
+      <span class="dim">Least-loaded judge first, track-scoped, skipping anyone on the team.</span>
+    </div>
+  </div>
+{% endif %}
+
+<h2>Judge progress</h2>
+<div class="panel scroll">
+  <table>
+    <thead><tr><th>Judge</th><th class="num">Assigned</th><th class="num">Done</th>
+      <th class="num">Outstanding</th><th style="width:220px">Progress</th></tr></thead>
+    <tbody>
+      {% for j in progress.judges %}
+        <tr>
+          <td>{{ j.name }}<div class="dim mono">{{ j.judge_id }}</div></td>
+          <td class="num">{{ j.assigned }}</td>
+          <td class="num">{{ j.completed }}</td>
+          <td class="num">{{ j.outstanding }}</td>
+          <td>
+            {% if j.assigned %}
+              <div class="bar-track"><div class="bar-fill" style="width: {{ j.percent }}%"></div></div>
+            {% else %}<span class="dim">nothing assigned</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if duplicates %}
+  <h2>Duplicate submissions</h2>
+  <div class="panel scroll">
+    <table>
+      <thead><tr><th>Duplicate</th><th>Of</th><th>Signal</th>
+        <th class="num">Slots consumed</th><th>Decision</th></tr></thead>
+      <tbody>
+        {% for d in duplicates %}
+          <tr>
+            <td><a href="/projects/{{ d.project_id }}">{{ d.project_id }}</a></td>
+            <td><a href="/projects/{{ d.duplicate_of }}">{{ d.duplicate_of }}</a></td>
+            <td class="dim">{{ d.reason }}</td>
+            <td class="num">{{ d.review_slots_consumed }}</td>
+            <td>
+              <button class="ghost" data-dup="{{ d.project_id }}" data-action="confirm">Confirm</button>
+              <button class="ghost" data-dup="{{ d.project_id }}" data-action="dismiss">Not a duplicate</button>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="sum" style="margin-top:10px">
+      Excluding removes the duplicate from the ranking only. Its ballots stay in
+      the judge-calibration fit, because a judge's tendency measured on a
+      duplicate is still a real measurement of that judge.
+    </p>
+  </div>
+{% endif %}
+
+<h2>Rubric</h2>
+<div class="panel scroll">
+  <table>
+    <thead><tr><th>Key</th><th>Label</th><th class="num">Weight</th></tr></thead>
+    <tbody>
+      {% for c in rubric %}
+        <tr><td class="mono">{{ c.key }}</td><td>{{ c.label }}</td>
+            <td class="num">{{ c.weight }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="sum" style="margin-top:10px">
+    Weights are per-event rows, not constants. Editing them via
+    <code>PUT /api/events/{{ event.id }}/rubric</code> bumps
+    <code>rubric_version</code>, which invalidates the results cache, so a
+    mid-event rubric change cannot leave a stale leaderboard behind.
+  </p>
+</div>
+
+<h2>Exports</h2>
+<div class="panel">
+  <p class="sum">
+    RFC 4180 CSV, CRLF line endings, no byte-order mark, one file per stage.
+  </p>
+  <p>
+    {% for stage in ['projects','teams','judges','assignments','scores','results','audit'] %}
+      <a class="badge" href="/api/exports/{{ stage }}.csv">{{ stage }}.csv</a>
+    {% endfor %}
+    <a class="badge" href="/api/exports/event.json">event.json</a>
+  </p>
+  <p class="sum">
+    <code>event.json</code> round-trips through
+    <code>POST /api/imports/event.json</code>, so a whole event can be moved
+    between installations.
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const assign = document.getElementById('assign');
+if (assign) assign.addEventListener('click', async () => {
+  assign.disabled = true;
+  try {
+    const plan = await api(
+      'POST', '/api/organizer/assignments/generate?event_id={{ event.id }}');
+    flash('Created ' + plan.created + ' assignment(s). Unfillable: ' +
+          (plan.unfillable.length || 0) + '.', 'ok');
+    setTimeout(() => location.reload(), 900);
+  } catch (e) { flash(e.message, 'bad'); assign.disabled = false; }
+});
+
+document.querySelectorAll('button[data-dup]').forEach(b => {
+  b.addEventListener('click', async () => {
+    try {
+      await api('POST', '/api/organizer/duplicates/' + b.dataset.dup,
+                {action: b.dataset.action, note: 'decided from the organizer console'});
+      location.reload();
+    } catch (e) { flash(e.message, 'bad'); }
+  });
+});
+</script>
+{% endblock %}

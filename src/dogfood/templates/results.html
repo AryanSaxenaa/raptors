@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Results &middot; Dogfood Portal{% endblock %}
+
+{#
+  The claim in the brief is that harsh and generous judges should not decide the
+  winner. This page is the evidence for that claim: raw beside calibrated, with
+  the rank movement made explicit so the effect is visible rather than asserted.
+#}
+
+{% block body %}
+<h1>Normalized results</h1>
+<p class="lede">
+  {{ result.observations }} ballots from {{ result.judges | length }} judges over
+  {{ leaderboard | length }} ranked projects. Method
+  <span class="mono">{{ method }}</span>.
+</p>
+
+<form method="get" action="/organizer/results" class="panel"
+      style="display:flex; gap:12px; align-items:flex-end">
+  <div style="flex:1">
+    <label for="method">Method</label>
+    <select id="method" name="method" onchange="this.form.submit()">
+      <option value="raw" {% if method == 'raw' %}selected{% endif %}>
+        raw — simple weighted mean
+      </option>
+      <option value="shrunken_z" {% if method == 'shrunken_z' %}selected{% endif %}>
+        shrunken_z — per-judge z-score with a shrunken scale
+      </option>
+      <option value="additive_ridge" {% if method == 'additive_ridge' %}selected{% endif %}>
+        additive_ridge — ridge-penalised two-way model
+      </option>
+    </select>
+  </div>
+  <div style="flex:0 0 auto">
+    <a class="btn ghost" href="/api/exports/results.csv?event_id={{ event_id }}">results.csv</a>
+    <a class="btn ghost"
+       href="/api/organizer/results?event_id={{ event_id }}&amp;method={{ method }}">json</a>
+  </div>
+</form>
+
+<h2>What the correction did</h2>
+<div class="grid c4">
+  <div class="stat">
+    <div class="n">{{ '%.4f' % result.judge_spread_before }}</div>
+    <div class="k">between-judge &sigma; before</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ '%.4f' % result.judge_spread_after }}</div>
+    <div class="k">between-judge &sigma; after</div>
+  </div>
+  <div class="stat">
+    {% set drop = result.judge_spread_before - result.judge_spread_after %}
+    <div class="n">
+      {{ '%.1f' % (100 * drop / result.judge_spread_before) if result.judge_spread_before else '0.0' }}%
+    </div>
+    <div class="k">spread removed</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ result.iterations }}</div>
+    <div class="k">iterations {{ 'converged' if result.converged else 'NOT converged' }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <p class="sum">
+    The correction is not a per-judge z-score. A z-score divides by a standard
+    deviation that is zero for a judge who scored everything the same, and it is
+    meaningless for a judge with one ballot. Instead the scale is shrunk toward
+    the pool, <code>&sigma;&#771; = (n&sigma; + k&sigma;<sub>pool</sub>)/(n + k)</code>
+    with k = {{ result.params.k_shrink }}, so it can never be zero; and the bias is fitted
+    by a ridge-penalised additive model with
+    &lambda;<sub>judge</sub> = {{ result.params.lambda_judge }} and
+    &lambda;<sub>project</sub> = {{ result.params.lambda_project }}, so a judge
+    with one ballot has only
+    {{ '%.0f' % (100 / (1 + result.params.lambda_judge)) }}% of their residual
+    attributed to bias instead of all of it. Residual sd after the fit is
+    {{ '%.4f' % result.residual_sd }}.
+    Full derivation and a worked example:
+    <a href="/api/organizer/normalization-proof?event_id={{ event_id }}">proof artefact</a>.
+  </p>
+</div>
+
+<h2>Leaderboard</h2>
+<div class="panel scroll">
+  <table>
+    <thead><tr>
+      <th class="num">#</th><th>Project</th><th>Team</th><th>Track</th>
+      <th class="num">n</th><th class="num">raw</th><th class="num">calibrated</th>
+      <th class="num">&plusmn;</th><th>rank move</th>
+    </tr></thead>
+    <tbody>
+      {% for r in leaderboard %}
+        <tr>
+          <td class="num">{{ r.position }}</td>
+          <td><a href="/projects/{{ r.project_id }}">{{ r.title }}</a>
+              <div class="dim mono">{{ r.project_id }}</div></td>
+          <td>{{ r.team or '-' }}</td>
+          <td class="dim">{{ r.track or '-' }}</td>
+          <td class="num">
+            {{ r.n_reviews }}
+            {% if r.low_confidence %}<span class="badge warn" title="Fewer reviews than the target">thin</span>{% endif %}
+          </td>
+          <td class="num">{{ '%.3f' % r.raw if r.raw is not none else '-' }}</td>
+          <td class="num"><b>{{ '%.3f' % r.score if r.score is not none else '-' }}</b></td>
+          <td class="num dim">{{ '%.3f' % r.std_error if r.std_error is not none else '-' }}</td>
+          <td>
+            {% if r.rank_delta is none or r.rank_delta == 0 %}
+              <span class="dim">&mdash;</span>
+            {% elif r.rank_delta > 0 %}
+              <span class="delta up">&uarr; {{ r.rank_delta }}</span>
+            {% else %}
+              <span class="delta down">&darr; {{ -r.rank_delta }}</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="sum">
+  Rank movement compares the raw ranking with the calibrated one. A project that
+  moves is a project whose position depended on which judges happened to see it.
+</p>
+
+<h2>Judge diagnostics</h2>
+<div class="panel scroll">
+  <table>
+    <thead><tr>
+      <th>Judge</th><th class="num">n</th><th class="num">raw mean</th><th class="num">raw &sigma;</th>
+      <th class="num">shrunk &sigma;</th><th class="num">scale</th><th class="num">bias</th><th>flags</th>
+    </tr></thead>
+    <tbody>
+      {% for j in result.judges %}
+        <tr>
+          <td class="mono">{{ j.judge_id }}</td>
+          <td class="num">{{ j.n_reviews }}</td>
+          <td class="num">{{ '%.3f' % j.raw_mean }}</td>
+          <td class="num">{{ '%.3f' % j.raw_sd }}</td>
+          <td class="num">{{ '%.3f' % j.shrunk_sd }}</td>
+          <td class="num">{{ '%.3f' % j.scale_factor }}</td>
+          <td class="num">{{ '%+.3f' % j.bias }}</td>
+          <td>
+            {% if j.is_flat %}<span class="badge warn" title="Zero variance: a z-score would divide by zero">flat</span>{% endif %}
+            {% if j.single_ballot %}<span class="badge warn" title="Bias only partly identifiable">single ballot</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="sum">
+  A positive bias is a generous judge; the correction subtracts it. The rows
+  flagged <b>flat</b> and <b>single ballot</b> are the two cases that break a
+  naive z-score, and they are present in the published fixture data.
+</p>
+{% endblock %}

@@ -1,0 +1,25 @@
+[portal]
+base_url = "http://localhost:8080"
+
+[tiers]
+claimed = ["T1", "T2"]
+
+[auth]
+organizer = "Cookie: df_session=org_7f2a"
+judge_a = "Cookie: df_session=jdg_a_91bc"
+judge_b = "Cookie: df_session=jdg_b_44de"
+participant = "Cookie: df_session=prt_2e88"
+
+[routes]
+gallery = "/projects"
+submit = "/api/events/evt_01/projects"
+judge_scores = "/api/judge/scores"
+peer_scores = "/api/judge/scores?judge=jdg_01"
+csv_export = "/api/exports/results.csv"
+
+[notes]
+tier_claim = "T1 and T2 are what this suite can verify, so they are what is claimed. T3 shipped too, and T4 partly, but run.py contains no check for either and caps its verified list at T2 for everyone, so claiming further would only print a claimed-but-not-verified note. That work is listed in README.md under Beyond the verified tiers, each item pointing at the test that covers it."
+parser = "This file is written to parse identically under tomllib and under the hand-rolled parse_toml in run.py. No value contains a hash character, every array uses double quotes only, and every key sits under a section header. tests/test_dogfood_toml.py parses it both ways and asserts the two results are equal."
+peer_scores_route = "peer_scores is set explicitly rather than left to fall back to judge_scores. Without it run.py probes judge_scores as judge_b, which is a judge reading their own empty list and correctly answers 200, and the isolation check fails on a portal that isolates correctly. The url given here returns judge jdg_01 ballots, so judge_b asking for it is a real cross-judge read."
+judge_a_identity = "judge_a is seeded as fixture judge jdg_01 and judge_b as jdg_02, which is why the peer_scores url names jdg_01."
+credentials = "One credential type. Each token below works as Cookie df_session or as Authorization Bearer. The fixed values are seeded only when DOGFOOD_DEV_TOKENS is set, and the server warns about them at boot."

@@ -1,0 +1,79 @@
+{#
+  Deliberately standalone rather than extending base.html. The error page has to
+  render when something is already wrong, so it must not depend on a database
+  connection or on the context the normal layout builds.
+
+  Same body as the JSON problem document at the same url, so a person and a
+  client see the same reason code.
+#}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ problem.status }} {{ problem.title }} &middot; Dogfood Portal</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top"><div class="wrap bar">
+  <a class="brand" href="/">DOG<span>FOOD</span></a>
+  <nav><a href="/projects">Gallery</a><a href="/login">Sign in</a></nav>
+</div></header>
+
+<main class="wrap">
+  <h1>{{ problem.status }} &middot; {{ problem.title }}</h1>
+  <div class="panel">
+    <p class="lede">{{ problem.detail }}</p>
+    <table><tbody>
+      <tr><th>Reason code</th><td class="mono">{{ problem.code }}</td></tr>
+      <tr><th>Status</th><td class="mono">{{ problem.status }}</td></tr>
+      {% if problem.instance %}
+        <tr><th>Path</th><td class="mono">{{ problem.instance }}</td></tr>
+      {% endif %}
+      {% if problem.required_capability %}
+        <tr><th>Capability required</th><td class="mono">{{ problem.required_capability }}</td></tr>
+      {% endif %}
+      {% if problem.your_role %}
+        <tr><th>Your role</th><td class="mono">{{ problem.your_role }}</td></tr>
+      {% endif %}
+      {% if problem.errors %}
+        <tr><th>Field errors</th><td class="mono">{{ problem.errors | tojson }}</td></tr>
+      {% endif %}
+    </tbody></table>
+
+    {% if problem.code in ('not_authenticated', 'role_required', 'capability_required',
+                           'peer_scores_denied', 'track_not_visible', 'aggregate_denied',
+                           'audit_denied') %}
+      <p class="sum">
+        This refusal is recorded in the audit trail with the actor, the missing
+        capability and this reason code. If you expected access,
+        <a href="/login">sign in as a different role</a> and compare
+        <a href="/api/auth/matrix">the role matrix as served</a>.
+      </p>
+    {% elif problem.code == 'submissions_closed' %}
+      <p class="sum">
+        The deadline is checked in the backend before anything else about the
+        request, so a late submission is refused for being late rather than for
+        failing validation.
+      </p>
+    {% elif problem.code == 'results_embargoed' %}
+      <p class="sum">
+        Results are held until the organizer publishes them. The embargo is
+        enforced at the API, so the leaderboard is not merely hidden in the UI.
+      </p>
+    {% endif %}
+
+    <p style="margin-top:18px">
+      <a class="btn ghost" href="/">Home</a>
+      <a class="btn ghost" href="/projects">Gallery</a>
+    </p>
+  </div>
+
+  <p class="sum">
+    The same url with <code>Accept: application/json</code> returns this as an
+    RFC 9457 <code>application/problem+json</code> document with the identical
+    <code>code</code>.
+  </p>
+</main>
+</body>
+</html>

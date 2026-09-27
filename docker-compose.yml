@@ -1,0 +1,19 @@
+services:
+  portal:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DOGFOOD_DEV_TOKENS: "1"
+      DOGFOOD_DB: /data/dogfood.sqlite3
+    volumes:
+      - dogfood_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  dogfood_data:

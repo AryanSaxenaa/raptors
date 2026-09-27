@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Sign in &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>Sign in</h1>
+<p class="lede">
+  Real password login, and the seeded development sessions the acceptance suite
+  uses. One credential type: the token below works as either
+  <code>Cookie: df_session=…</code> or <code>Authorization: Bearer …</code>.
+</p>
+
+<div class="grid c2">
+  <div class="panel">
+    <h3>Password</h3>
+    <div id="flash" class="notice" hidden></div>
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="organizer@dogfood.local">
+    <label for="password">Password</label>
+    <input type="password" id="password" placeholder="dogfood">
+    <div style="margin-top:16px"><button id="signin">Sign in</button></div>
+    <p class="sum" style="margin-top:14px">
+      Seeded accounts all use the password <code>dogfood</code>. Hashes are
+      scrypt with a per-user salt; see <code>security.py</code>.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h3>Seeded sessions</h3>
+    <p class="sum">
+      These are the headers in <code>.dogfood.toml</code>. They are fixed rather
+      than random so a committed acceptance report stays reproducible, which is
+      also why they are gated behind <code>DOGFOOD_DEV_TOKENS</code> and warned
+      about at boot.
+    </p>
+    <div class="scroll"><table>
+      <thead><tr><th>Role</th><th>Account</th><th>Header</th><th></th></tr></thead>
+      <tbody>
+        {% for l in seeded_logins %}
+          <tr>
+            <td><span class="badge">{{ l.label }}</span></td>
+            <td>{{ l.name }}<div class="dim mono">{{ l.email }}</div></td>
+            <td class="mono">Cookie: df_session={{ l.token }}</td>
+            <td><button class="ghost" data-token="{{ l.token }}">Use</button></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% if not who.is_anonymous %}
+      <div style="margin-top:14px"><button id="signout" class="ghost">Sign out</button></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <h3>The same thing from a terminal</h3>
+  <pre class="block">
+# public, no credential
+curl -s localhost:8080/projects | grep -o 'Glass Signal'
+
+# a judge reading their own ballots
+curl -s -H 'Cookie: df_session=jdg_a_91bc' localhost:8080/api/judge/scores
+
+# the other judge trying the same url: 403, and an audit entry
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H 'Cookie: df_session=jdg_b_44de' 'localhost:8080/api/judge/scores?judge=jdg_01'
+
+# the organizer on that same url: 200, because they hold peer_scores
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H 'Cookie: df_session=org_7f2a' 'localhost:8080/api/judge/scores?judge=jdg_01'</pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('button[data-token]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.cookie = 'df_session=' + b.dataset.token + '; path=/; samesite=lax';
+    location.href = '/';
+  });
+});
+
+document.getElementById('signin').addEventListener('click', async () => {
+  try {
+    await api('POST', '/api/auth/login', {
+      email: document.getElementById('email').value.trim(),
+      password: document.getElementById('password').value,
+    });
+    location.href = '/';
+  } catch (e) { flash(e.message, 'bad'); }
+});
+
+const out = document.getElementById('signout');
+if (out) out.addEventListener('click', async () => {
+  await api('POST', '/api/auth/logout');
+  location.href = '/login';
+});
+</script>
+{% endblock %}

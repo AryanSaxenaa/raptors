@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Submit a project &middot; Dogfood Portal{% endblock %}
+
+{#
+  The form renders even when the event is closed, and the API refuses the write.
+  Disabling the form instead would put the deadline in the frontend, which is
+  the class of mistake the brief is explicit about not accepting.
+#}
+
+{% block body %}
+<h1>Submit a project</h1>
+<p class="lede">
+  Drafts are editable until the deadline. The full field set below is the one the
+  spec gives as a reference, including organizer-defined custom questions.
+</p>
+
+<form class="panel" method="get" action="/projects/new" style="display:flex; gap:12px; align-items:flex-end">
+  <div style="flex:1">
+    <label for="event">Event</label>
+    <select id="event" name="event" onchange="this.form.submit()">
+      {% for e in events %}
+        <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>
+          {{ e.name }}{% if e.submissions_close %} — closes {{ e.submissions_close }}{% endif %}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+{% if closed %}
+  <div class="notice warn">
+    Submissions for <b>{{ event.name }}</b> closed at
+    <code>{{ event.submissions_close }}</code>. This form will submit and the API
+    will refuse it with <code>submissions_closed</code>. That is the check
+    working, not a bug &mdash; switch to the open event above to exercise the
+    lifecycle.
+  </div>
+{% endif %}
+
+{% if who.is_anonymous %}
+  <div class="notice bad">You are not signed in. <a href="/login">Sign in</a> as a participant.</div>
+{% elif not teams %}
+  <div class="notice warn">
+    You are not on a team for this event. Create one or join with an invite link
+    before submitting &mdash; see <code>POST /api/events/{{ event.id }}/teams</code>.
+  </div>
+{% endif %}
+
+<div id="flash" class="notice" hidden></div>
+
+<form class="panel" id="submit-form" onsubmit="return false">
+  <div class="row">
+    <div>
+      <label for="title">Name <span class="dim">(required)</span></label>
+      <input type="text" id="title" required maxlength="200">
+    </div>
+    <div>
+      <label for="track">Track</label>
+      <select id="track">
+        <option value="">No track</option>
+        {% for t in tracks %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="team">Team</label>
+      <select id="team">
+        {% for t in teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <label for="summary">Tagline</label>
+  <input type="text" id="summary" maxlength="300" placeholder="One line.">
+
+  <label for="description">Long description</label>
+  <textarea id="description" placeholder="What it does, how it works, what is unfinished."></textarea>
+
+  <div class="row">
+    <div><label for="repo_url">Repository url</label><input type="url" id="repo_url"></div>
+    <div><label for="live_url">Live link</label><input type="url" id="live_url"></div>
+  </div>
+  <div class="row">
+    <div><label for="video_url">Hosted demo video url</label><input type="url" id="video_url"></div>
+    <div><label for="thumbnail_url">Thumbnail url</label><input type="url" id="thumbnail_url"></div>
+  </div>
+  <div class="row">
+    <div>
+      <label for="images">Image gallery <span class="dim">(one url per line)</span></label>
+      <textarea id="images" style="min-height:60px"></textarea>
+    </div>
+    <div>
+      <label for="tech_tags">Tech tags <span class="dim">(comma separated)</span></label>
+      <input type="text" id="tech_tags" placeholder="python, sqlite, htmx">
+    </div>
+  </div>
+
+  {% if questions %}
+    <h3 style="margin-top:22px">Organizer questions</h3>
+    {% for q in questions %}
+      <label for="q_{{ q.id }}">{{ q.prompt }}{% if q.required %} <span class="dim">(required)</span>{% endif %}</label>
+      {% if q.kind == 'longtext' %}
+        <textarea id="q_{{ q.id }}" data-question="{{ q.id }}"></textarea>
+      {% else %}
+        <input type="text" id="q_{{ q.id }}" data-question="{{ q.id }}">
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  <div style="margin-top:20px; display:flex; gap:10px">
+    <button id="save-draft" class="ghost">Save as draft</button>
+    <button id="submit-now">Submit</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function payload(submit) {
+  const val = id => (document.getElementById(id).value || '').trim();
+  const answers = {};
+  document.querySelectorAll('[data-question]').forEach(el => {
+    if (el.value.trim()) answers[el.dataset.question] = el.value.trim();
+  });
+  const body = {
+    title: val('title'),
+    summary: val('summary'),
+    description: val('description'),
+    track: val('track') || null,
+    team: val('team') || null,
+    repo_url: val('repo_url') || null,
+    live_url: val('live_url') || null,
+    video_url: val('video_url') || null,
+    thumbnail_url: val('thumbnail_url') || null,
+    tech_tags: val('tech_tags').split(',').map(s => s.trim()).filter(Boolean),
+    images: val('images').split('\n').map(s => s.trim()).filter(Boolean),
+    custom_answers: answers,
+    submit: submit,
+  };
+  return body;
+}
+
+async function send(submit) {
+  if (!document.getElementById('title').value.trim()) {
+    flash('A name is required.', 'warn');
+    return;
+  }
+  try {
+    const created = await api('POST', '/api/events/{{ event.id }}/projects', payload(submit));
+    location.href = submit ? '/projects/' + created.id : '/projects/new?event={{ event.id }}';
+  } catch (e) {
+    // The API answers `submissions_closed` when the deadline has passed. Show
+    // the reason code, so a closed event is distinguishable from a bad field.
+    const code = e.problem && e.problem.code ? ' [' + e.problem.code + ']' : '';
+    flash(e.message + code, 'bad');
+  }
+}
+
+document.getElementById('save-draft').addEventListener('click', () => send(false));
+document.getElementById('submit-now').addEventListener('click', () => send(true));
+</script>
+{% endblock %}

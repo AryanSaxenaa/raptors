@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }} &middot; Dogfood Portal{% endblock %}
+
+{% block body %}
+<h1>{{ project.title }}</h1>
+<p class="lede">{{ project.tagline }}</p>
+
+{% if project.duplicate_of %}
+  <div class="notice warn">
+    Flagged as a possible duplicate of
+    <a href="/projects/{{ project.duplicate_of }}">{{ project.duplicate_of }}</a>
+    &mdash; {{ project.duplicate_reason }}. It is still listed and still stored; it is
+    excluded from the ranking while the organizer leaves that switch on.
+  </div>
+{% endif %}
+
+<div class="grid c2">
+  <div class="panel">
+    <h3>Submission</h3>
+    <table>
+      <tbody>
+        <tr><th>Project id</th><td class="mono">{{ project.id }}</td></tr>
+        <tr><th>Team</th><td>{{ project.team_name }} <span class="dim mono">{{ project.team_id }}</span></td></tr>
+        <tr><th>Track</th><td>{{ project.track_name or '-' }}</td></tr>
+        <tr><th>Event</th><td>{{ project.event_name }}</td></tr>
+        <tr><th>Submitted</th><td class="mono">{{ project.submitted_at or '-' }}</td></tr>
+        <tr><th>Status</th><td><span class="badge">{{ project.status }}</span></td></tr>
+        <tr><th>Repository</th><td>
+          {% if project.repo_url %}<a href="{{ project.repo_url }}" rel="nofollow noopener">{{ project.repo_url }}</a>
+          {% else %}<span class="dim">-</span>{% endif %}
+        </td></tr>
+        <tr><th>Live demo</th><td>
+          {% if project.live_url %}<a href="{{ project.live_url }}" rel="nofollow noopener">{{ project.live_url }}</a>
+          {% else %}<span class="dim">-</span>{% endif %}
+        </td></tr>
+        <tr><th>Demo video</th><td>
+          {% if project.video_url %}<a href="{{ project.video_url }}" rel="nofollow noopener">{{ project.video_url }}</a>
+          {% else %}<span class="dim">-</span>{% endif %}
+        </td></tr>
+        <tr><th>Members</th><td>{{ members | map(attribute='name') | join(', ') }}</td></tr>
+        <tr><th>Reviews</th><td>
+          {{ review_count }}
+          {% if review_count < 3 %}<span class="badge warn">under-reviewed</span>{% endif %}
+        </td></tr>
+      </tbody>
+    </table>
+    {% if project.description %}
+      <h3 style="margin-top:20px">Description</h3>
+      <p class="sum">{{ project.description }}</p>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h3>Comments</h3>
+    {% if not comments %}<p class="sum">No comments yet.</p>{% endif %}
+    {% for c in comments %}
+      <div style="border-top:1px solid var(--line); padding:10px 0">
+        <div class="meta">{{ c.author }} &middot; {{ c.created_at }}</div>
+        <div class="sum">{{ c.body }}</div>
+      </div>
+    {% endfor %}
+
+    {% if not who.is_anonymous %}
+      <div id="flash" class="notice" hidden></div>
+      <label for="comment">Add a comment</label>
+      <textarea id="comment" placeholder="Rate-limited to 20 per five minutes."></textarea>
+      <div style="margin-top:10px"><button id="post-comment">Post comment</button></div>
+    {% else %}
+      <p class="sum" style="margin-top:14px"><a href="/login">Sign in</a> to comment.</p>
+    {% endif %}
+  </div>
+</div>
+
+<p style="margin-top:18px"><a class="btn ghost" href="/projects">Back to the gallery</a></p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const btn = document.getElementById('post-comment');
+if (btn) btn.addEventListener('click', async () => {
+  const body = document.getElementById('comment').value.trim();
+  if (!body) { flash('Write something first.', 'warn'); return; }
+  btn.disabled = true;
+  try {
+    await api('POST', '/api/projects/{{ project.id }}/comments', {body});
+    location.reload();
+  } catch (e) {
+    flash(e.message, 'bad');
+    btn.disabled = false;
+  }
+});
+</script>
+{% endblock %}
