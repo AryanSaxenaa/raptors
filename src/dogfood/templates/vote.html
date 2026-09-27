@@ -9,23 +9,19 @@
   Ballot order is shuffled per voter to reduce position bias.
 </p>
 
-<form class="panel" method="get" action="/vote" style="display:flex; gap:12px; align-items:flex-end">
-  <div style="flex:1">
-    <label for="event">Event</label>
-    <select id="event" name="event" onchange="this.form.submit()">
-      {% for e in events %}
-        <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
+<form class="panel ballot-event" method="get" action="/vote">
+  <label for="event">Event</label>
+  <select id="event" name="event" onchange="this.form.submit()">
+    {% for e in events %}
+      <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
+    {% endfor %}
+  </select>
 </form>
 
 <div id="flash" class="notice" hidden></div>
 
-<div class="panel">
-  <p class="sum" id="budget">Loading ballot…</p>
-  <div id="ballot"></div>
-</div>
+<p class="ballot-budget sum" id="budget">Loading ballot…</p>
+<div class="ballot-list" id="ballot" aria-live="polite"></div>
 
 <p class="sum">
   Results stay embargoed until the organizer publishes.
@@ -38,47 +34,51 @@
 const eventId = {{ event.id | tojson }};
 
 function appendBallotRow(root, p, creditBudget) {
-  const row = document.createElement('div');
-  row.style.borderTop = '1px solid var(--line)';
-  row.style.padding = '12px 0';
+  const row = document.createElement('article');
+  row.className = 'ballot-item';
 
   const head = document.createElement('div');
+  head.className = 'ballot-item__head';
+  const title = document.createElement('h4');
   const link = document.createElement('a');
   link.href = '/projects/' + encodeURIComponent(p.id);
-  const title = document.createElement('b');
-  title.textContent = p.title || '';
-  link.appendChild(title);
-  head.appendChild(link);
-  head.appendChild(document.createTextNode(' '));
+  link.textContent = p.title || '';
+  title.appendChild(link);
+  head.appendChild(title);
   const idSpan = document.createElement('span');
-  idSpan.className = 'dim mono';
+  idSpan.className = 'ballot-item__id dim mono';
   idSpan.textContent = p.id || '';
   head.appendChild(idSpan);
   row.appendChild(head);
 
-  const tag = document.createElement('div');
-  tag.className = 'dim';
+  const tag = document.createElement('p');
+  tag.className = 'sum ballot-item__tag';
   tag.textContent = p.tagline || '';
   row.appendChild(tag);
 
+  const actions = document.createElement('div');
+  actions.className = 'ballot-item__actions';
+
   const label = document.createElement('label');
-  label.textContent = 'Credits ';
+  label.className = 'ballot-item__credits';
+  label.textContent = 'Credits';
   const input = document.createElement('input');
   input.type = 'number';
   input.min = '1';
   input.max = String(creditBudget);
   input.value = '1';
   input.dataset.project = p.id;
-  input.style.cssText = 'width:80px;margin-left:8px';
+  input.className = 'ballot-credits';
+  input.setAttribute('aria-label', 'Credits for ' + (p.title || p.id));
   label.appendChild(input);
-  row.appendChild(label);
+  actions.appendChild(label);
 
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = 'Cast vote';
   btn.dataset.vote = p.id;
-  row.appendChild(document.createTextNode(' '));
-  row.appendChild(btn);
+  actions.appendChild(btn);
+  row.appendChild(actions);
 
   btn.addEventListener('click', async () => {
     const credits = parseInt(input.value, 10) || 1;
