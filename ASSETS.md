@@ -8,10 +8,10 @@ Drawn for this project (no third-party licence; use within this repo).
 
 | File | What it is |
 | --- | --- |
-| `src/dogfood/static/raptor.svg` | Field-plate raptor, side view, used as the source drawing |
-| `src/dogfood/templates/_raptor.html` | The same plate, inlined so the eye can blink |
-| `src/dogfood/static/mark.svg` | Header mark: raptor head in a specimen frame |
-| `src/dogfood/static/favicon.svg` | Station favicon |
+| `src/dogfood/static/raptor.svg` | Engraved lateral dromaeosaur plate, with caption and scale bar |
+| `src/dogfood/templates/_raptor.html` | The same animal, inlined so the eye can blink |
+| `src/dogfood/static/mark.svg` | Header mark: simplified raptor in a specimen frame |
+| `src/dogfood/static/favicon.svg` | Station favicon, same simplified raptor on a canopy tile |
 | `src/dogfood/static/footprint.svg` | Three-toed track used by the scroll gait |
 | `src/dogfood/static/claw.svg` | Claw-scratch divider |
 | `src/dogfood/static/topo.svg` | Repeating contour-line tile |

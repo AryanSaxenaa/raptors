@@ -50,8 +50,8 @@ Body size is 16px, line-height 1.6. Headings use Fraunces with tight leading. Ca
 
 ## Components
 
-- **Station header.** Sticky canopy bar, original raptor-head mark, wordmark DOGFOOD, “Field station” subtitle. Primary links underline in amber when current. Below 860px the links collapse into a Menu disclosure.
-- **Hero.** Display title plus the original raptor plate. The title wipes in like a claw scratch. The plate’s eye blinks on a slow cycle. Both motions are disabled under `prefers-reduced-motion`.
+- **Station header.** Sticky canopy bar, a simplified raptor mark (tail, snout, eye, sickle claw), wordmark DOGFOOD, “Field station” subtitle. Primary links underline in amber when current. Below 860px the links collapse into a Menu disclosure.
+- **Hero.** Display title plus an engraved lateral plate of a dromaeosaur: stiff tail, lean skull, feathered arm, and an amber sickle claw. A specimen line and a one-metre scale sit under the plate. The title wipes in like a claw scratch. The plate’s eye blinks on a slow cycle. Both motions are disabled under `prefers-reduced-motion`.
 - **Kickers.** Mono labels (Catalogue, Specimen, Ballot, Chain of custody) sit above each page title.
 - **Specimen cards.** Bone sheet, corner ticks, “Specimen / id” line, Fraunces title, tag chips.
 - **Panels and stats.** Same bone sheet. Stats get a catalogue corner and a Fraunces numeral.

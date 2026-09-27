@@ -289,6 +289,28 @@ p.lede { color: #d7ccb6; margin: 0 0 22px; max-width: 68ch; }
 }
 .hero-art { color: var(--bone); }
 .raptor-plate { width: 100%; height: auto; display: block; }
+.plate-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  margin: 8px 2px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d7ccb6;
+}
+.scalebar { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.scalebar i {
+  display: inline-block;
+  width: 52px;
+  height: 7px;
+  border-bottom: 1.5px solid #f3ecdf;
+  border-left: 1.5px solid #f3ecdf;
+  border-right: 1.5px solid #f3ecdf;
+}
 .hero h1 {
   animation: scratch-in 780ms cubic-bezier(0.16, 0.84, 0.32, 1) both;
 }
