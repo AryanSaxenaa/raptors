@@ -11,14 +11,16 @@
     </h1>
     <div id="hero-raptor" class="hero__raptor" data-lottie="{{ static_url('raptor-hero.lottie.json') }}" data-fallback="{{ static_url('raptor-hero.svg') }}" aria-hidden="true"></div>
   </div>
-  <p class="hero__sub">
-    {{ event.name }} &mdash; self-hosted portal for submissions, isolation, and
-    calibrated scores. Seeded with the official fixtures so judges compare software, not demo data.
-  </p>
-  <div class="hero__actions">
-    <a class="btn" href="/projects">Browse gallery</a>
-    <a class="btn ghost" href="/docs">OpenAPI</a>
-    <a class="btn ghost" href="/login">Sign in</a>
+  <div class="hero__copy">
+    <p class="hero__sub">
+      {{ event.name }} &mdash; self-hosted portal for submissions, isolation, and
+      calibrated scores. Seeded with the official fixtures so judges compare software, not demo data.
+    </p>
+    <div class="hero__actions">
+      <a class="btn" href="/projects">Browse gallery</a>
+      <a class="btn ghost" href="/docs">OpenAPI</a>
+      <a class="btn ghost" href="/login">Sign in</a>
+    </div>
   </div>
 </section>
 {% endblock %}
@@ -33,7 +35,7 @@
   var fallback = box.getAttribute('data-fallback');
   function showFallback() {
     if (hero) hero.classList.remove('hero--lottie-ready');
-    box.innerHTML = '<img src="' + fallback + '" alt="" width="520" height="640" style="width:100%;height:100%;object-fit:contain">';
+    box.innerHTML = '<img src="' + fallback + '" alt="" width="520" height="640" style="width:100%;height:100%;object-fit:cover;object-position:bottom center">';
   }
   function start() {
     if (!window.lottie) {
@@ -48,7 +50,7 @@
         autoplay: true,
         path: box.getAttribute('data-lottie'),
         rendererSettings: {
-          preserveAspectRatio: 'xMidYMid meet',
+          preserveAspectRatio: 'xMaxYMax slice',
           viewBoxOnly: true,
         },
       });

@@ -108,20 +108,21 @@ header.top nav a.on { font-weight: 600; }
 /* ----------------------------------------------------------------- hero */
 
 .hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  position: relative;
   width: 100%;
-  padding: 88px 20px 48px;
+  min-height: 100dvh;
+  overflow: hidden;
   background: var(--bg);
 }
-/* Same artboard as the Ollivere t-rex Lottie (1150×615). Headline + bite live inside it. */
+/* Fill the first screen and pin the artboard to the bottom so the T-rex
+   reads as coming up from below the fold. */
 .hero__stage {
-  position: relative;
-  width: min(100%, 1150px);
-  max-width: 100%;
-  aspect-ratio: 1150 / 615;
-  margin: 0 auto;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 0;
+  pointer-events: none;
 }
 .hero__title {
   position: absolute;
@@ -158,7 +159,13 @@ header.top nav a.on { font-weight: 600; }
 }
 .hero__raptor {
   position: absolute;
-  inset: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform: none;
   z-index: 1;
   pointer-events: none;
   user-select: none;
@@ -167,31 +174,47 @@ header.top nav a.on { font-weight: 600; }
   display: block;
   width: 100% !important;
   height: 100% !important;
-  max-width: 100%;
-  max-height: 100%;
+}
+.hero__copy {
+  position: absolute;
+  left: 0;
+  right: auto;
+  bottom: 36px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: min(46%, 440px);
+  padding: 0 20px 0 5%;
+  pointer-events: none;
+}
+.hero__copy a {
+  pointer-events: auto;
 }
 .hero__sub {
-  position: relative;
-  z-index: 1;
-  margin: 28px auto 0;
+  margin: 0;
   max-width: 42ch;
-  text-align: center;
+  text-align: left;
   font: 17px/1.5 var(--serif);
   color: var(--ink-dim);
 }
 .hero__actions {
-  position: relative;
-  z-index: 1;
-  margin-top: 22px;
+  margin-top: 18px;
   display: flex;
   gap: 12px;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
 }
 
 @media (max-width: 720px) {
-  .hero {
-    padding-top: 76px;
+  .hero__raptor {
+    width: 140%;
+    left: auto;
+    right: -12%;
+  }
+  .hero__copy {
+    width: min(92%, 440px);
+    bottom: 16px;
   }
 }
 
