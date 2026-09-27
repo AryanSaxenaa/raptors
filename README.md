@@ -2,6 +2,34 @@
 
 Self-hostable hackathon submission and judging platform for [DOGFOOD 2026](https://dogfoodhack.com). Python 3.12, FastAPI, SQLite, server-rendered gallery, JSON API for writes.
 
+## Requirement → artefact → test
+
+| Requirement | Artefact | How to verify |
+| --- | --- | --- |
+| T1 public gallery + fixture titles | `GET /projects`, `routers/web.py` | `python run.py .dogfood.toml`; `pytest tests/test_acceptance_invariants.py` |
+| T2 own vs peer judge scores | `security.py`, `GET /api/judge/scores` | `run.py`; `pytest tests/test_role_matrix.py` |
+| T2 CSV export | `exports.py`, `GET /api/exports/*.csv` | `run.py`; `pytest tests/test_csv.py` |
+| R14 deadline before validation | `routers/web.py` | `pytest tests/test_deadline.py` |
+| R21 track isolation (25-cell matrix) | `security.py` `ROLE_MATRIX` | `pytest tests/test_role_matrix.py` |
+| R30 audit trail | `audit.py`, `/organizer/audit`, `GET /api/audit/verify` | `pytest tests/test_adversarial.py`; portal after login |
+| R41 import/export | `exports.py`, `docs/migration.md` | Organizer JSON + CSV routes; migration doc |
+| R42 normalization proof | `JUDGING.md`, `docs/normalization-proof.txt`, `normalize.py` | `python -m dogfood.normalize --proof --fixtures fixtures.json`; `pytest tests/test_normalize.py` |
+| R45 API-first | `/docs`, `/openapi.json`, `docs/openapi.json` | `python -m dogfood export-openapi` |
+| R44 threat model | `THREAT-MODEL.md` | Read file (mitigations + explicit gaps) |
+| R16 full submission fields | `DATA-MODEL.md`, `schema.sql`, `/projects/new` | Schema + form fields |
+| Architecture | `ARCHITECTURE.md` | Request path + trust boundary |
+| Scale (~400 projects) | `tests/test_scale.py` | `pytest tests/test_scale.py` |
+| Duplicate handling | `seed.py`, `prj_41` | `pytest tests/test_duplicates.py` |
+
+OpenAPI: [docs/openapi.json](docs/openapi.json) (also live at `/openapi.json` when serving).
+
+## What this does not do yet
+
+- **Pairwise judging** — Bradley–Terry mode sketched in `JUDGING.md`, not implemented.
+- **T3/T4 tier claims in `.dogfood.toml`** — community voting, webhooks, and related bonuses ship in code but are not claimed because `run.py` cannot verify them.
+- **Production hardening** — dev tokens default on in local config; set `DOGFOOD_DEV_TOKENS=0` for real deployments.
+- **DDoS / multi-tenant isolation** — see `THREAT-MODEL.md`.
+
 ## Quick start
 
 ```bash
@@ -18,7 +46,8 @@ In another terminal:
 
 ```bash
 python run.py .dogfood.toml > acceptance-report.txt
-python tests/smoke.py
+python -m pytest tests/ -q --ignore=tests/smoke.py
+python tests/smoke.py    # optional black-box; fresh DB recommended
 ```
 
 Docker:
@@ -55,8 +84,7 @@ Portal: http://localhost:8080
 ## Tests
 
 ```bash
-set PYTHONPATH=src
-python -m pytest tests/ -q
+python -m pytest tests/ -q --ignore=tests/smoke.py
 python tests/smoke.py    # black-box; use a fresh DB for strict counts
 ```
 
@@ -64,9 +92,7 @@ For a clean smoke run: stop the server, `python -m dogfood reset`, start `serve`
 
 ## Beyond the verified tiers
 
-Shipped but not in `run.py`: community comments and rate limits, quadratic voting with per-voter ballot shuffle, bulk JSON import/export, OpenAPI, hash-chained audit log, judge participation records, threat-model notes in `THREAT-MODEL.md` (when present). Each is reachable via the API the UI uses.
-
-Pairwise judging mode is intentionally not implemented; see `JUDGING.md` (when present) for the sketched Bradley–Terry extension.
+Shipped but not in `run.py`: community comments and rate limits, quadratic voting with per-voter ballot shuffle, bulk JSON import/export, hash-chained audit log, judge participation records. Each is reachable via the API the UI uses.
 
 ## Layout
 
@@ -79,7 +105,12 @@ src/dogfood/          application
 fixtures.json         sample event
 run.py                acceptance checker
 .dogfood.toml         routes and test credentials
-INTEL.md / PLAN.md    audit notes (optional to commit)
+ARCHITECTURE.md       request path and trust boundary
+DATA-MODEL.md         schema and import/export
+JUDGING.md            assignment, rubric, normalization
+THREAT-MODEL.md       mitigations and non-claims
+docs/migration.md     move between hosts
+docs/openapi.json     committed OpenAPI snapshot
 ```
 
 ## Environment

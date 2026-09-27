@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import json
 import sys
+import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -132,6 +134,23 @@ def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) ->
     app.state.templates.env.globals["settings"] = config
 
     install_error_handlers(app, app.state.templates)
+
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+        started = time.perf_counter()
+        response = await call_next(request)
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+        record = {
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "duration_ms": elapsed_ms,
+        }
+        print(json.dumps(record, separators=(",", ":")), flush=True)
+        response.headers["X-Request-Id"] = request_id
+        return response
 
     from .routers import auth, community, events, judging, organizer, projects, web
 

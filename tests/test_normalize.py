@@ -38,7 +38,8 @@ def test_fixture_spread_drops_after_calibration(fixtures: dict):
     result = compute(_observations(fixtures), method="additive_ridge", excluded_project_ids={"prj_41"})
     assert result.converged
     assert result.judge_spread_after < result.judge_spread_before
-    assert result.judge_spread_before > 0.3
+    assert 0.35 < result.judge_spread_before < 0.50
+    assert 0.20 < result.judge_spread_after < 0.30
 
 
 def test_zero_variance_judge_is_flagged_not_nan(fixtures: dict):
