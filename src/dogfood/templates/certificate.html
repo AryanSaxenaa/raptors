@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Certificate &middot; {{ cert.title }}{% endblock %}
+
+{% block body %}
+<div class="panel" style="max-width:720px;margin:0 auto;padding:36px">
+  <p class="dim" style="text-transform:uppercase;letter-spacing:.12em;font-size:12px">Participation certificate</p>
+  <h1>{{ cert.title }}</h1>
+  <p class="lede">
+    {{ cert.team or 'Independent' }}
+    {% if cert.track %} &middot; {{ cert.track }}{% endif %}
+    &middot; {{ cert.event.name }}
+  </p>
+  <table>
+    <tbody>
+      <tr><th>Rank</th><td class="num">{{ cert.position }}</td></tr>
+      <tr><th>Reviews</th><td class="num">{{ cert.n_reviews }}</td></tr>
+      <tr><th>Method</th><td class="mono">{{ cert.method }}</td></tr>
+      <tr><th>Issued</th><td class="mono">{{ cert.issued_at }}</td></tr>
+      <tr><th>Record hash</th><td class="mono" style="word-break:break-all">{{ cert.record_hash }}</td></tr>
+    </tbody>
+  </table>
+  <p class="sum" style="margin-top:18px">
+    Verify at <code>GET /api/records/{{ cert.record_hash }}</code>
+    or <code>POST /api/records/verify</code> with this JSON.
+    The hash is SHA-256 over the audit chain head and the canonical payload.
+    It is not an X.509 certificate.
+  </p>
+  <p><a href="/projects/{{ cert.project_id }}">Back to project</a></p>
+</div>
+{% endblock %}

@@ -53,6 +53,9 @@
 <div class="cards">
   {% for p in projects %}
     <article class="card">
+      {% if p.thumbnail_url %}
+        <p class="dim"><a href="{{ p.thumbnail_url }}" rel="nofollow noopener">thumbnail</a></p>
+      {% endif %}
       <h4><a href="/projects/{{ p.id }}">{{ p.title }}</a></h4>
       <p class="sum">{{ p.summary }}</p>
       <div class="meta">

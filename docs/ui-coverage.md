@@ -12,13 +12,15 @@ Most writes use the JSON API from HTML pages (`ARCHITECTURE.md`). The table belo
 | Teams | `/teams`, `/teams/join/{code}` | `POST /api/events/{id}/teams`, `POST /api/teams/join` |
 | Community vote | `/vote` | `GET/POST /api/events/{id}/ballot`, `/votes` |
 | Sign in | `/login` | `POST /api/auth/login` |
+| Certificate | `/certificates/{id}` | `GET /api/projects/{id}/certificate` (after publish) |
+| Public record | — | `GET /api/records/{hash}`, `POST /api/records/verify` |
 
 ## Judge
 
 | Flow | UI | API |
 | --- | --- | --- |
 | Queue + ballot | `/judge`, `/judge/projects/{id}` | `POST /api/judge/scores` |
-| Participation record | Button on judge console | `GET /api/judges/{judge_id}/record` |
+| Participation record | Button on judge console | `GET /api/judges/{judge_id}/record` (stable hash; public copy at `/api/records/{hash}`) |
 
 ## Organizer
 

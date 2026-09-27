@@ -234,6 +234,14 @@ def project_page(request: Request, conn: Conn, who: Who, project_id: str) -> Any
             "review_count": query_one(
                 conn, "SELECT COUNT(*) AS n FROM scores WHERE project_id = ?", (project_id,)
             )["n"],
+            "images": [
+                r["url"]
+                for r in query(
+                    conn,
+                    "SELECT url FROM project_images WHERE project_id = ? ORDER BY sort",
+                    (project_id,),
+                )
+            ],
         },
     )
 
@@ -514,3 +522,15 @@ def embed_gallery(
     )
     response.headers["Content-Security-Policy"] = "frame-ancestors *"
     return response
+
+
+@router.get("/certificates/{project_id}", response_class=HTMLResponse)
+def certificate_page(request: Request, conn: Conn, who: Who, project_id: str) -> Any:
+    from .organizer import project_certificate
+
+    cert = project_certificate(conn, who, project_id)
+    return _templates(request).TemplateResponse(
+        request,
+        "certificate.html",
+        {**_base(request, conn, who), "cert": cert},
+    )

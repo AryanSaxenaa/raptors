@@ -48,6 +48,18 @@
       <h3 style="margin-top:20px">Description</h3>
       <p class="sum">{{ project.description }}</p>
     {% endif %}
+    {% if images %}
+      <h3 style="margin-top:20px">Image gallery</h3>
+      <div class="grid c2">
+        {% for url in images %}
+          <p><a href="{{ url }}" rel="nofollow noopener">{{ url }}</a></p>
+        {% endfor %}
+      </div>
+    {% endif %}
+    <p class="sum" style="margin-top:16px">
+      <a href="/certificates/{{ project.id }}">Certificate</a>
+      <span class="dim">(issued after the organizer publishes results)</span>
+    </p>
   </div>
 
   <div class="panel">

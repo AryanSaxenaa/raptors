@@ -7,6 +7,7 @@ Suggested script for the submission video. Record against a **fresh** portal (`p
 3. **Participant path (60s)** — Login as participant; open demo event; create team (show name collision flag); draft project not in gallery; submit; appears in gallery.
 4. **Judge isolation (60s)** — Judge A ballot; Judge B denied on `/api/judge/scores?judge=jdg_01` (403 + `peer_scores_denied`); organizer can read peer scores.
 5. **Organizer (90s)** — Progress/assignments; normalized results (`/organizer/results`); normalization proof; duplicate `prj_41`; export CSV; `/organizer/audit` showing the denial row.
-6. **Close (15s)** — `python run.py .dogfood.toml` PASS; link to docs and OpenAPI `/docs`.
+6. **Records (20s)** — Judge console → download record; open `/api/records/{hash}` unauthenticated. After publish, `/certificates/prj_01`.
+7. **Close (15s)** — `python run.py .dogfood.toml` PASS; open `JUDGING.md` proof numbers; link `/docs`.
 
 Keep browser devtools or a second terminal visible for one API denial so judges see server-side enforcement, not UI-only hiding.

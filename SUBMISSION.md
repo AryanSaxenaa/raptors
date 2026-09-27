@@ -14,7 +14,7 @@ Use this before you tag a release or hand the repo to judges. Items marked **aut
 | Architecture / data / judging docs | **automated** | `ARCHITECTURE.md`, `DATA-MODEL.md`, `JUDGING.md` |
 | Threat model | **automated** | `THREAT-MODEL.md` |
 | OpenAPI snapshot | **automated** | `docs/openapi.json`; CI regenerates on push |
-| Your tests beyond the checker | **automated** | `python -m pytest tests/ -q --ignore=tests/smoke.py` (63 tests; slow locally ~10 min; CI on push) |
+| Your tests beyond the checker | **automated** | `python -m pytest tests/ -q --ignore=tests/smoke.py` (~65 tests; slow locally ~10 min; CI on push) |
 | Adversarial smoke report | **automated** | `python tests/smoke.py > smoke-report.txt` (193 checks; resets DB on localhost) |
 
 ## Required outside the repository (you)
@@ -45,7 +45,7 @@ Docker: `docker compose up --build` then point `.dogfood.toml` `base_url` at the
 ## Known non-goals (documented, not bugs)
 
 - Pairwise / Bradley–Terry judging (`JUDGING.md`)
-- Externally signed participant certificates (judge records are hash-anchored JSON only)
+- X.509 / CA-signed certificates (hash-anchored JSON records are shipped)
 - Production hardening with dev tokens off (`THREAT-MODEL.md`, `DOGFOOD_DEV_TOKENS=0`)
 
 Implemented T4 extras (not claimed in `.dogfood.toml`): webhooks, embeddable gallery, organizer setup UI — see [docs/ui-coverage.md](docs/ui-coverage.md).

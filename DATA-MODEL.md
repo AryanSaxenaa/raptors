@@ -1,45 +1,100 @@
 # Data model
 
-The submission field set follows the brief’s reference list (name/tagline, long description, media URLs, tech tags, track, custom questions). `fixtures.json` is input data, not the schema: the database carries the full field set even when a fixture row is sparse.
+`fixtures.json` is **input**, not the schema. The published file is sparse (title, summary, repo, scores). The database carries the full field set the website lists as stable across platforms: name, tagline, long description, thumbnail, image gallery, hosted demo video URL, repository URL, live link, tech tags, track, organizer-defined custom questions.
 
-## Core tables (from `schema.sql`)
+Hand-written DDL lives in `src/dogfood/schema.sql`. There is no ORM. Every CHECK, UNIQUE, and index an operator relies on is visible in that file.
 
-| Table | Purpose |
+## Conventions
+
+1. **Ids are opaque TEXT.** Fixture ids (`evt_01`, `prj_07`, `jdg_01`, `tm_07`) are stored verbatim so a record in the JSON file and a row in SQLite are the same object.
+2. **Everything below `events` carries `event_id`.** Nothing is globally scoped; a second event cannot read the first by omission.
+3. **Timestamps are ISO-8601 UTC strings.** Deadline comparison uses parsed instants, not string sort, in `require_submissions_open`.
+4. **JSON-in-TEXT** only where the list is bounded: `tech_tags`, webhook `actions`, custom question `options`. Relational data (images, criteria, members) is tables, not nested arrays.
+
+## Identity
+
+| Table | Role |
 | --- | --- |
-| `users` | Accounts; `role` CHECK in (`visitor` roles stored as participant/judge/organizer/admin) |
-| `sessions` | Opaque tokens bound to users |
-| `events` | Deadlines, rubric version, normalization method, duplicate policy |
-| `tracks`, `prizes` | Event configuration |
-| `teams`, `team_members` | Team formation; invite codes |
-| `projects` | Submissions; `status`, `duplicate_of`, full URL fields |
-| `rubric_criteria` | Per-event weighted criteria keys |
-| `judges`, `judge_tracks` | Judge roster and track assignment |
-| `assignments` | Review queue |
-| `scores`, `score_criteria` | Ballots; `CHECK (value BETWEEN 1 AND 5)` |
-| `results_cache` | Serialized normalization output keyed by method + rubric version |
-| `votes`, `comments` | T3 community features |
-| `audit_log` | Hash-chained append-only log |
+| `users` | One person. `role` CHECK in `visitor`, `participant`, `judge`, `organizer`, `admin`. Email unique on `lower(email)`. Passwords: scrypt, per-user salt. |
+| `sessions` | Opaque `token` primary key. Cookie `df_session` or `Authorization: Bearer`. Role is read from this row, never from the request body. |
 
-Team names are **not** unique per event: `fixtures.json` repeats names (`OpenSignal`, `StillTrail`, `AmberSwitch`) across different teams. Identity is the team id.
+A judge is a **user** plus a per-event `judges` row. The role matrix has one subject type.
 
-Duplicate submissions are annotated, not deleted:
+## Event configuration
 
-```sql
-duplicate_of TEXT REFERENCES projects (id),
-duplicate_reason TEXT,
-status CHECK (... 'flagged_duplicate' ...)
+| Table | Role |
+| --- | --- |
+| `events` | Deadlines, voting window, `results_published`, `reviews_per_project`, `normalization_method`, `exclude_duplicates`, `rubric_version`. |
+| `tracks` | UNIQUE `(event_id, name)`. |
+| `prizes` | Optional `amount_cents` / currency. |
+| `rubric_criteria` | Weighted keys; replacing the set increments `rubric_version`. |
+| `custom_questions` | Organizer-defined prompts (`text`, `longtext`, `url`, `select`, `boolean`). |
+
+## Teams and submissions
+
+| Table | Role |
+| --- | --- |
+| `teams` | `invite_code` UNIQUE. **No UNIQUE (event_id, name)** — fixtures repeat `OpenSignal`, `StillTrail`, `AmberSwitch` across different teams. Identity is the id; name collisions warn at create. |
+| `team_members` | `owner` / `member`. |
+| `projects` | Full field set; `status` in `draft`, `submitted`, `flagged_duplicate`, `withdrawn`. `submitted_at` set when leaving draft. |
+| `project_images` | Gallery URLs, ordered. |
+| `custom_answers` | Answers keyed by question id. |
+
+Duplicates are **annotated, not deleted**:
+
+```
+duplicate_of TEXT REFERENCES projects (id)
+duplicate_reason TEXT
+status = 'flagged_duplicate'
 ```
 
-## Import / export
+`prj_41` points at `prj_07` (“same team and identical title”). Ranking excludes it when `exclude_duplicates = 1`; calibration does not.
 
-| Direction | Format | Entry point |
+Solo teams (13 in the fixture) have no minimum-member constraint.
+
+## Judging
+
+| Table | Role |
+| --- | --- |
+| `judges` | Per-event roster, invite code, status. |
+| `judge_tracks` | Track scope. |
+| `assignments` | Review queue. |
+| `scores` | One ballot header (comment, timestamps). |
+| `score_criteria` | `value INTEGER CHECK (value BETWEEN 1 AND 5)`. |
+| `results_cache` | Serialized normalizer output keyed by `(event_id, method, rubric_version)`. |
+
+## Community, audit, ops
+
+| Table | Role |
+| --- | --- |
+| `comments` | Rate-limited; `hidden` flag. |
+| `votes` | UNIQUE `(event_id, project_id, voter_key)`; `credits` for quadratic influence. |
+| `rate_limits` | Sliding windows for comments and votes. |
+| `audit_log` | Append-only, `prev_hash` / `entry_hash`. No UPDATE/DELETE in application code. |
+| `webhooks`, `webhook_deliveries`, `webhook_outbox` | Signed POSTs; outbox so audit writes never block on HTTP. |
+| `issued_records` | Persisted judge records and project certificates, keyed by `record_hash`. |
+
+Indexes exist on every foreign-key lookup used by the gallery, judge queue, and audit filters (`projects_gallery_idx`, `audit_action_idx`, …).
+
+## Import and export
+
+An organizer can leave. That is a requirement of Adoptability (20%), not a courtesy.
+
+| Direction | Format | Route |
 | --- | --- | --- |
-| Out | CSV per stage | `GET /api/exports/{stage}.csv` |
+| Out | RFC 4180 CSV, CRLF, no BOM | `GET /api/exports/{projects,teams,judges,assignments,scores,results,audit}.csv` |
 | Out | Full event JSON | `GET /api/exports/event.json` |
-| In | Event JSON snapshot | `POST /api/imports/event.json` |
+| In | Same JSON snapshot (or `fixtures.json` unchanged) | `POST /api/imports/event.json` |
+| Out | Byte-identical backup | copy `DOGFOOD_DB` |
 
-CSV uses `csv.writer` with CRLF and no BOM. See `docs/migration.md` for a practical move-between-hosts checklist.
+CSV uses `csv.writer` quoting so formula injection (`=cmd`) is quoted. Round-trip of commas and quotes is tested in `tests/test_csv.py`.
 
-## Fixture ids
+Operational checklist: `docs/migration.md`. Seed is idempotent on fixture ids (`tests/test_adversarial.py::test_seed_idempotent_on_second_bootstrap`).
 
-Primary keys match `fixtures.json` (`prj_07`, `jdg_01`, …) so diffs between file and database are direct comparisons, not through a mapping table.
+## Health and schema version
+
+`schema_meta.version` must match `SCHEMA_VERSION` in code. `GET /api/health` reports both plus fixture counts. A process that is up with an empty database is **not** ready; the health check fails in that window so `run.py` never greps an empty gallery.
+
+## Why this shape
+
+Deeply nested “user.posts.comments” documents would cap at SQLite array-in-JSON practicality and make “update one ballot” a rewrite of the parent. Flat tables plus ids match how organizers actually query: “all scores for this judge”, “all projects in this track”, “audit rows for this denial”.

@@ -28,7 +28,7 @@ OpenAPI: [docs/openapi.json](docs/openapi.json) (also live at `/openapi.json` wh
 ## What this does not do yet
 
 - **Pairwise judging** — Bradley–Terry mode sketched in `JUDGING.md`, not implemented.
-- **Participant certificates** — judge participation records are hash-anchored JSON (see judge console); not an external signing workflow.
+- **X.509 / CA-signed certificates** — judge records and project certificates are hash-anchored JSON (`/api/records/{hash}`), not a public-key infrastructure.
 - **T3/T4 in `.dogfood.toml`** — still only **T1/T2 claimed** because `run.py` verifies those tiers only.
 - **Production hardening** — dev tokens default on in local/Docker demo config; set `DOGFOOD_DEV_TOKENS=0` for real deployments.
 - **DDoS / multi-tenant isolation** — see `THREAT-MODEL.md`.
@@ -42,6 +42,7 @@ OpenAPI: [docs/openapi.json](docs/openapi.json) (also live at `/openapi.json` wh
 | Organizer setup | `/organizer/setup` |
 | Webhooks | `/organizer/webhooks` |
 | Embeddable gallery | `/embed/gallery` + `/static/embed.js` |
+| Project certificate | `/certificates/{project_id}` |
 
 Details: [docs/ui-coverage.md](docs/ui-coverage.md).
 
@@ -101,7 +102,7 @@ Portal: http://localhost:8080
 ## Tests
 
 ```bash
-python -m pytest tests/ -q --ignore=tests/smoke.py   # 63 tests; ~10 min locally (each test re-seeds fixtures)
+python -m pytest tests/ -q --ignore=tests/smoke.py   # ~65 tests; ~10 min locally (each test re-seeds fixtures)
 python tests/smoke.py    # black-box; 193 checks; use a fresh DB for strict counts
 ```
 
@@ -109,7 +110,7 @@ CI runs the same pytest command on push (`.github/workflows/ci.yml`). For a clea
 
 ## Beyond the verified tiers
 
-Shipped in code but not in `run.py`: community **comments** and **quadratic voting** (UI at `/vote`), **webhooks** (API + `/organizer/webhooks`), **embeddable gallery** (`/embed/gallery`, `embed.js`), bulk import/export, hash-chained audit log, judge participation records on the judge console.
+Shipped in code but not in `run.py`: community **comments** and **quadratic voting** (UI at `/vote`), **webhooks** (API + `/organizer/webhooks`), **embeddable gallery** (`/embed/gallery`, `embed.js`), bulk import/export, hash-chained audit log, **public records** (`/api/records/{hash}`), **project certificates** after publish.
 
 ## Layout
 

@@ -34,6 +34,8 @@ def test_dogfood_toml_parsers_agree():
     routes = from_tomllib["routes"]
     assert "peer_scores" in routes
     assert routes["peer_scores"] != routes.get("judge_scores", "")
+    assert from_tomllib["tiers"]["pitch"]
+    assert "#" not in from_tomllib["tiers"]["pitch"]
 
 
 def test_claimed_tiers_match_verifiable_suite():

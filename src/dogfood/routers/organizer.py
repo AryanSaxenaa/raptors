@@ -14,11 +14,17 @@ from typing import Any
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from .. import assignment, audit, exports, normalize, results, seed
-from ..db import parse_ts, query, query_one, transaction
+from .. import assignment, audit, exports, normalize, records, results, seed
+from ..db import query, query_one, transaction
 from ..deps import Conn, Who, default_event_id, get_event
 from ..errors import ApiError
-from ..security import Capability, Operation, require_capability, require_operation
+from ..security import (
+    Capability,
+    Operation,
+    has_capability,
+    require_capability,
+    require_operation,
+)
 
 router = APIRouter(prefix="/api", tags=["organizer"])
 
@@ -329,8 +335,9 @@ async def import_json(request: Request, conn: Conn, who: Who) -> dict[str, Any]:
 def judge_record_certificate(conn: Conn, who: Who, judge_id: str) -> dict[str, Any]:
     """A verifiable statement of what a judge actually did.
 
-    The audit chain head is the anchor: the record quotes it, so a record can
-    be checked against the log it was drawn from rather than merely believed.
+    Issued once and stored. Anyone can fetch the same JSON later at
+    GET /api/records/{record_hash} and recompute the hash. No ballot scores
+    are included.
     """
     judge = query_one(conn, "SELECT * FROM judges WHERE id = ?", (judge_id,))
     if judge is None:
@@ -353,21 +360,69 @@ def judge_record_certificate(conn: Conn, who: Who, judge_id: str) -> dict[str, A
         r["track_id"]
         for r in query(conn, "SELECT track_id FROM judge_tracks WHERE judge_id = ?", (judge_id,))
     ]
-    chain = audit.verify_chain(conn)
     event = get_event(conn, event_id)
-    record = {
-        "judge_id": judge_id,
-        "name": judge["display_name"],
-        "event": {"id": event_id, "name": event["name"]},
-        "tracks": sorted(tracks),
-        "reviews_completed": int(completed),
-        "reviews_assigned": int(assigned),
-        "issued_at": parse_ts(None) or None,
-    }
-    record["issued_at"] = audit.utcnow()
-    record["audit_chain_head"] = chain.get("head_hash")
-    record["audit_chain_ok"] = chain.get("ok")
-    record["record_hash"] = audit._entry_hash(  # noqa: SLF001 - same canonical form on purpose
-        chain.get("head_hash") or audit.GENESIS_HASH, record
-    )
-    return record
+    with transaction(conn):
+        return records.issue(
+            conn,
+            kind="judge",
+            subject_id=judge_id,
+            event_id=event_id,
+            body={
+                "judge_id": judge_id,
+                "name": judge["display_name"],
+                "event": {"id": event_id, "name": event["name"]},
+                "tracks": sorted(tracks),
+                "reviews_completed": int(completed),
+                "reviews_assigned": int(assigned),
+            },
+        )
+
+
+@router.get("/records/{record_hash}", summary="Fetch a public hash-anchored record")
+def public_record(conn: Conn, record_hash: str) -> dict[str, Any]:
+    payload = records.get_by_hash(conn, record_hash)
+    if payload is None:
+        raise ApiError("not_found", f"no record '{record_hash}'")
+    return payload
+
+
+@router.post("/records/verify", summary="Recompute a record hash")
+async def verify_record(conn: Conn, request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise ApiError("invalid_request", "body is not valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise ApiError("invalid_request", "expected an object")
+    return records.verify_payload(conn, payload)
+
+
+@router.get("/projects/{project_id}/certificate", summary="Published project certificate")
+def project_certificate(conn: Conn, who: Who, project_id: str) -> dict[str, Any]:
+    project = query_one(conn, "SELECT * FROM projects WHERE id = ?", (project_id,))
+    if project is None or project["status"] == "draft":
+        raise ApiError("not_found", f"no project '{project_id}'")
+    event = get_event(conn, project["event_id"])
+    if not event["results_published"] and not has_capability(who.role, Capability.AGGREGATE):
+        raise ApiError("results_embargoed", "certificates are issued after results are published")
+    board = results.leaderboard(conn, project["event_id"])
+    row = next((item for item in board if item["project_id"] == project_id), None)
+    if row is None:
+        raise ApiError("not_found", "project is not on the published ranking")
+    with transaction(conn):
+        return records.issue(
+            conn,
+            kind="certificate",
+            subject_id=project_id,
+            event_id=project["event_id"],
+            body={
+                "project_id": project_id,
+                "title": row["title"],
+                "team": row["team"],
+                "track": row["track"],
+                "event": {"id": event["id"], "name": event["name"]},
+                "position": row["position"],
+                "method": results.get_results(conn, project["event_id"]).method,
+                "n_reviews": row["n_reviews"],
+            },
+        )

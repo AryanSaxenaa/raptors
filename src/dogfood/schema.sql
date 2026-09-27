@@ -393,3 +393,17 @@ CREATE TABLE IF NOT EXISTS webhook_outbox (
 );
 
 CREATE INDEX IF NOT EXISTS webhook_outbox_pending_idx ON webhook_outbox (processed_at, created_at);
+
+-- Publicly fetchable, hash-anchored statements. Issued once so the hash is stable.
+CREATE TABLE IF NOT EXISTS issued_records (
+    record_hash TEXT PRIMARY KEY,
+    kind        TEXT NOT NULL CHECK (kind IN ('judge', 'certificate')),
+    subject_id  TEXT NOT NULL,
+    event_id    TEXT,
+    payload     TEXT NOT NULL,
+    issued_at   TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS issued_records_subject_uq
+    ON issued_records (kind, subject_id);
+CREATE INDEX IF NOT EXISTS issued_records_event_idx ON issued_records (event_id);

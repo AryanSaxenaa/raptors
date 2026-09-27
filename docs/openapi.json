@@ -1912,7 +1912,7 @@
           "organizer"
         ],
         "summary": "Signed judge participation record",
-        "description": "A verifiable statement of what a judge actually did.\n\nThe audit chain head is the anchor: the record quotes it, so a record can\nbe checked against the log it was drawn from rather than merely believed.",
+        "description": "A verifiable statement of what a judge actually did.\n\nIssued once and stored. Anyone can fetch the same JSON later at\nGET /api/records/{record_hash} and recompute the hash. No ballot scores\nare included.",
         "operationId": "judge_record_certificate_api_judges__judge_id__record_get",
         "parameters": [
           {
@@ -1933,6 +1933,114 @@
                 "schema": {
                   "type": "object",
                   "title": "Response Judge Record Certificate Api Judges  Judge Id  Record Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/records/{record_hash}": {
+      "get": {
+        "tags": [
+          "organizer"
+        ],
+        "summary": "Fetch a public hash-anchored record",
+        "operationId": "public_record_api_records__record_hash__get",
+        "parameters": [
+          {
+            "name": "record_hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Record Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Public Record Api Records  Record Hash  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/records/verify": {
+      "post": {
+        "tags": [
+          "organizer"
+        ],
+        "summary": "Recompute a record hash",
+        "operationId": "verify_record_api_records_verify_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Verify Record Api Records Verify Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_id}/certificate": {
+      "get": {
+        "tags": [
+          "organizer"
+        ],
+        "summary": "Published project certificate",
+        "operationId": "project_certificate_api_projects__project_id__certificate_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Project Certificate Api Projects  Project Id  Certificate Get"
                 }
               }
             }

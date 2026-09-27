@@ -9,7 +9,14 @@ import time
 from dogfood.db import connect
 from dogfood.webhooks import flush_outbox, sign_body
 
-from tests.helpers import FIXTURE_EVENT, ORG_TOKEN, PARTICIPANT_TOKEN, auth
+from tests.helpers import (
+    FIXTURE_EVENT,
+    JUDGE_A_TOKEN,
+    JUDGE_B_TOKEN,
+    ORG_TOKEN,
+    PARTICIPANT_TOKEN,
+    auth,
+)
 
 
 def test_webhook_register_and_auth(client):
@@ -95,3 +102,41 @@ def test_openapi_lists_webhooks(client):
     paths = spec.get("paths", {})
     assert "/api/webhooks" in paths
     assert "/api/webhooks/{webhook_id}/test" in paths
+    assert "/api/records/{record_hash}" in paths
+
+
+def test_judge_record_is_stable_public_and_isolated(client):
+    first = client.get("/api/judges/jdg_01/record", headers=auth(JUDGE_A_TOKEN))
+    assert first.status_code == 200
+    record = first.json()
+    assert record["record_hash"]
+    assert "criteria" not in record
+    second = client.get("/api/judges/jdg_01/record", headers=auth(JUDGE_A_TOKEN))
+    assert second.json()["record_hash"] == record["record_hash"]
+    public = client.get(f"/api/records/{record['record_hash']}")
+    assert public.status_code == 200
+    assert public.json()["judge_id"] == "jdg_01"
+    verified = client.post("/api/records/verify", json=record)
+    assert verified.status_code == 200
+    assert verified.json()["ok"] is True
+    peer = client.get("/api/judges/jdg_01/record", headers=auth(JUDGE_B_TOKEN))
+    assert peer.status_code in (401, 403)
+
+
+def test_certificate_embargoed_until_publish(client):
+    blocked = client.get("/api/projects/prj_01/certificate", headers=auth(PARTICIPANT_TOKEN))
+    assert blocked.status_code == 403
+    publish = client.patch(
+        f"/api/events/{FIXTURE_EVENT}",
+        json={"results_published": True},
+        headers=auth(ORG_TOKEN),
+    )
+    assert publish.status_code == 200
+    cert = client.get("/api/projects/prj_01/certificate", headers=auth(PARTICIPANT_TOKEN))
+    assert cert.status_code == 200
+    body = cert.json()
+    assert body["project_id"] == "prj_01"
+    assert body["position"] >= 1
+    page = client.get("/certificates/prj_01", headers=auth(PARTICIPANT_TOKEN))
+    assert page.status_code == 200
+    assert "prj_01" in page.text or "Glass Signal" in page.text
