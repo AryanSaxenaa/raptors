@@ -131,6 +131,7 @@ def list_entries(
     *,
     event_id: str | None = None,
     action: str | None = None,
+    reason_code: str | None = None,
     actor_user_id: str | None = None,
     limit: int = 200,
     offset: int = 0,
@@ -142,6 +143,9 @@ def list_entries(
     if action:
         clauses.append("action = ?")
         params.append(action)
+    if reason_code:
+        clauses.append("reason_code = ?")
+        params.append(reason_code)
     if actor_user_id:
         clauses.append("actor_user_id = ?")
         params.append(actor_user_id)

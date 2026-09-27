@@ -241,11 +241,14 @@ def seed(
     conn.execute(
         """
         INSERT INTO events (id, name, slug, description, submissions_close,
+                            voting_opens_at, voting_closes_at,
                             reviews_per_project, is_fixture, created_at)
-        VALUES (?, ?, ?, ?, ?, 3, 1, ?)
+        VALUES (?, ?, ?, ?, ?, '2020-01-01T00:00:00Z', '2099-01-01T00:00:00Z', 3, 1, ?)
         ON CONFLICT (id) DO UPDATE SET
             name = excluded.name,
-            submissions_close = excluded.submissions_close
+            submissions_close = excluded.submissions_close,
+            voting_opens_at = excluded.voting_opens_at,
+            voting_closes_at = excluded.voting_closes_at
         """,
         (
             event_id,

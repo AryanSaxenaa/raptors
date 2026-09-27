@@ -217,6 +217,7 @@ def get_audit(
     who: Who,
     event_id: str | None = None,
     action: str | None = None,
+    reason_code: str | None = None,
     actor: str | None = None,
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
@@ -224,8 +225,13 @@ def get_audit(
     require_capability(conn, who, Capability.AUDIT_LOG, event_id=event_id)
     return {
         "entries": audit.list_entries(
-            conn, event_id=event_id, action=action, actor_user_id=actor,
-            limit=limit, offset=offset,
+            conn,
+            event_id=event_id,
+            action=action,
+            reason_code=reason_code,
+            actor_user_id=actor,
+            limit=limit,
+            offset=offset,
         ),
         "total": query_one(conn, "SELECT COUNT(*) AS n FROM audit_log")["n"],
     }

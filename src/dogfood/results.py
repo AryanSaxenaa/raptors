@@ -15,6 +15,7 @@ import sqlite3
 from typing import Any
 
 from .db import query, query_one, utcnow
+from .errors import ApiError
 from .normalize import (
     METHODS,
     NormalizationResult,
@@ -86,7 +87,11 @@ def compute_results(
         raise KeyError(event_id)
     chosen = method or event["normalization_method"]
     if chosen not in METHODS:
-        chosen = "additive_ridge"
+        raise ApiError(
+            "invalid_request",
+            f"unknown normalization method '{chosen}'",
+            extra={"methods": list(METHODS)},
+        )
     project_ids = [
         row["id"]
         for row in query(
@@ -113,9 +118,19 @@ def get_results(
     event = event_row(conn, event_id)
     if event is None:
         raise KeyError(event_id)
+    if method is not None and method not in METHODS:
+        raise ApiError(
+            "invalid_request",
+            f"unknown normalization method '{method}'",
+            extra={"methods": list(METHODS)},
+        )
     chosen = method or event["normalization_method"]
     if chosen not in METHODS:
-        chosen = "additive_ridge"
+        raise ApiError(
+            "invalid_request",
+            f"unknown normalization method '{chosen}'",
+            extra={"methods": list(METHODS)},
+        )
     version = int(event["rubric_version"])
 
     if not refresh:

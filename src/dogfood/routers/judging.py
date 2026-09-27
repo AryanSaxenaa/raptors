@@ -20,7 +20,7 @@ import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel, Field, conint
+from pydantic import BaseModel, Field, field_validator
 
 from .. import audit, results
 from ..db import query, query_one, transaction, utcnow
@@ -48,12 +48,27 @@ class BallotIn(BaseModel):
     the schema, because the scale is a property of the rubric and not of the
     request."""
 
-    model_config = {"extra": "forbid", "strict": True}
+    model_config = {"extra": "forbid"}
 
     project_id: str
-    criteria: dict[str, conint(ge=1, le=5)] = Field(min_length=1)
+    criteria: dict[str, int] = Field(min_length=1)
     comment: str = Field(default="", max_length=4000)
     event_id: str | None = None
+
+    @field_validator("criteria", mode="before")
+    @classmethod
+    def criteria_must_be_plain_ints(cls, value: object) -> dict[str, int]:
+        if not isinstance(value, dict):
+            raise ValueError("criteria must be a JSON object")
+        out: dict[str, int] = {}
+        for key, raw in value.items():
+            if not isinstance(key, str):
+                raise ValueError("criterion keys must be strings")
+            # Reject bool before int(): bool is a subclass of int in Python.
+            if isinstance(raw, bool) or not isinstance(raw, int):
+                raise ValueError(f"criterion '{key}' must be an integer score")
+            out[key] = raw
+        return out
 
 
 def _scores_for_judge(

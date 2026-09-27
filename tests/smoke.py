@@ -18,12 +18,16 @@ this project's dependencies.
 from __future__ import annotations
 
 import json
+import os
 import secrets
+import subprocess
 import sys
+from pathlib import Path
 import urllib.error
 import urllib.request
 
 BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8080").rstrip("/")
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 ORG = "org_7f2a"
 JUDGE_A = "jdg_a_91bc"
@@ -32,8 +36,28 @@ PARTICIPANT = "prt_2e88"
 
 FIXTURE_EVENT = "evt_01"
 DEMO_EVENT = "evt_demo"
+FIXTURE_PROJECTS = 41
+FIXTURE_SCORES = 126
 
 _results: list[tuple[bool, str, str]] = []
+
+
+def prepare_environment() -> None:
+    """Reset the local database when probing localhost so counts stay deterministic."""
+    host = BASE.lower()
+    if not (host.startswith("http://localhost") or host.startswith("http://127.0.0.1")):
+        return
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT / "src")
+    env.setdefault("DOGFOOD_DEV_TOKENS", "1")
+    subprocess.run(
+        [sys.executable, "-m", "dogfood", "reset"],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
 
 def request(
@@ -594,8 +618,13 @@ def audit_chain() -> None:
     # Provoke a denial and confirm it lands in the log.
     before = payload["entries"]
     request("/api/judge/scores?judge=jdg_01", token=JUDGE_B)
-    status, text, _ = request("/api/audit?action=authorization.denied", token=ORG)
+    status, text, _ = request(
+        "/api/audit?reason_code=peer_scores_denied", token=ORG
+    )
     entries = json.loads(text)["entries"] if status == 200 else []
+    if not entries:
+        status, text, _ = request("/api/audit?action=authorization.denied", token=ORG)
+        entries = json.loads(text)["entries"] if status == 200 else []
     check("a refusal is recorded", bool(entries), f"{status} {text[:140]}")
     check(
         "the recorded refusal names the actor and the reason",
@@ -636,9 +665,16 @@ def operations() -> None:
     if check("health responds", status == 200, text[:140]):
         payload = json.loads(text)
         check("health reports readiness", payload.get("ok") is True, text[:200])
+        fixture = payload.get("fixture_counts", {})
+        check(
+            "health reports the seeded counts",
+            fixture.get("projects") == FIXTURE_PROJECTS
+            and fixture.get("scores", 0) >= FIXTURE_SCORES,
+            text[:200],
+        )
         check(
             "health reports at least the fixture project count",
-            payload.get("counts", {}).get("projects") >= 41,
+            payload.get("counts", {}).get("projects") >= FIXTURE_PROJECTS,
             text[:200],
         )
         check(
@@ -741,9 +777,20 @@ def voting() -> None:
 
 
 def main() -> int:
+    prepare_environment()
     for section in (
-        public_surface, transports, role_matrix, deadline, lifecycle, balloting,
-        normalization, csv_bytes, audit_chain, operations, rate_limits, voting,
+        public_surface,
+        transports,
+        role_matrix,
+        deadline,
+        normalization,
+        lifecycle,
+        balloting,
+        csv_bytes,
+        audit_chain,
+        operations,
+        rate_limits,
+        voting,
     ):
         try:
             section()

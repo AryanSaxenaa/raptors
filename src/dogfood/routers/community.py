@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from .. import audit
 from ..db import parse_ts, query, query_one, transaction, utcnow
@@ -60,11 +60,10 @@ class CommentIn(BaseModel):
 
 class VoteIn(BaseModel):
     model_config = {"extra": "forbid"}
-    project_id: str
-    # Quadratic: influence is sqrt(credits), so 4 credits buys 2x the weight
-    # of 1 credit rather than 4x.
+
+    project_id: str = Field(min_length=1)
     credits: int = Field(default=1, ge=1, le=VOTE_CREDIT_BUDGET)
-    email: EmailStr | None = None
+    email: str | None = Field(default=None, max_length=320)
 
 
 def _voter_key(

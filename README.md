@@ -47,7 +47,7 @@ In another terminal:
 ```bash
 python run.py .dogfood.toml > acceptance-report.txt
 python -m pytest tests/ -q --ignore=tests/smoke.py
-python tests/smoke.py    # optional black-box; fresh DB recommended
+python tests/smoke.py    # black-box; auto-resets DB on localhost before running
 ```
 
 Docker:
@@ -88,7 +88,7 @@ python -m pytest tests/ -q --ignore=tests/smoke.py
 python tests/smoke.py    # black-box; use a fresh DB for strict counts
 ```
 
-For a clean smoke run: stop the server, `python -m dogfood reset`, start `serve` again, then run smoke.
+For a clean smoke run against a remote host, point `python tests/smoke.py http://host:port` at the target. On `localhost`, smoke resets the database first via `python -m dogfood reset`.
 
 ## Beyond the verified tiers
 

@@ -191,6 +191,17 @@ def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) ->
                     "judges": judges_n,
                     "scores": scores_n,
                 },
+                "fixture_event_id": "evt_01",
+                "fixture_counts": {
+                    "projects": scalar(
+                        conn, "SELECT COUNT(*) FROM projects WHERE event_id = 'evt_01'"
+                    )
+                    or 0,
+                    "scores": scalar(
+                        conn, "SELECT COUNT(*) FROM scores WHERE event_id = 'evt_01'"
+                    )
+                    or 0,
+                },
             },
             status_code=200 if ready else 503,
         )
