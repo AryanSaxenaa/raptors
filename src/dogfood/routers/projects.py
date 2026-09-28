@@ -368,6 +368,16 @@ def _project_payload(conn: sqlite3.Connection, project_id: str) -> dict[str, Any
     }
 
 
+_GALLERY_SORT: dict[str, str] = {
+    "arrival": "p.submitted_at ASC, p.id ASC",
+    "newest": "p.submitted_at DESC, p.id DESC",
+    "title": "p.title COLLATE NOCASE ASC, p.id ASC",
+    "track": "tr.name COLLATE NOCASE ASC, p.title COLLATE NOCASE ASC",
+    "comments": "comment_count DESC, p.submitted_at ASC, p.id ASC",
+    "votes": "vote_count DESC, p.submitted_at ASC, p.id ASC",
+}
+
+
 def gallery_rows(
     conn: sqlite3.Connection,
     *,
@@ -376,6 +386,7 @@ def gallery_rows(
     track: str | None = None,
     team: str | None = None,
     tag: str | None = None,
+    sort: str = "arrival",
     limit: int = GALLERY_PAGE_SIZE,
     offset: int = 0,
 ) -> tuple[list[dict[str, Any]], int]:
@@ -406,6 +417,7 @@ def gallery_rows(
         needle = f"%{q.lower()}%"
         params.extend([needle, needle, needle])
     where = " AND ".join(clauses)
+    order = _GALLERY_SORT.get(sort, _GALLERY_SORT["arrival"])
 
     total = query_one(conn, f"SELECT COUNT(*) AS n FROM projects p WHERE {where}", params)
     rows = query(
@@ -413,12 +425,17 @@ def gallery_rows(
         f"""
         SELECT p.id, p.title, p.tagline, p.status, p.repo_url, p.live_url, p.thumbnail_url,
                p.tech_tags, p.submitted_at, p.duplicate_of, p.event_id,
-               t.name AS team_name, tr.name AS track_name, tr.id AS track_id
+               t.name AS team_name, tr.name AS track_name, tr.id AS track_id,
+               (SELECT COUNT(*) FROM comments c
+                 WHERE c.project_id = p.id AND c.hidden = 0) AS comment_count,
+               (SELECT COUNT(*) FROM votes v WHERE v.project_id = p.id) AS vote_count,
+               (SELECT url FROM project_images pi
+                 WHERE pi.project_id = p.id ORDER BY pi.sort LIMIT 1) AS cover_url
           FROM projects p
           LEFT JOIN teams t ON t.id = p.team_id
           LEFT JOIN tracks tr ON tr.id = p.track_id
          WHERE {where}
-         ORDER BY p.submitted_at ASC, p.id ASC
+         ORDER BY {order}
          LIMIT ? OFFSET ?
         """,
         [*params, limit, offset],
@@ -433,12 +450,14 @@ def gallery_rows(
             "track_id": r["track_id"],
             "repo_url": r["repo_url"],
             "live_url": r["live_url"],
-            "thumbnail_url": r["thumbnail_url"],
+            "thumbnail_url": r["thumbnail_url"] or r["cover_url"],
             "tech_tags": json.loads(r["tech_tags"] or "[]"),
             "submitted_at": r["submitted_at"],
             "is_duplicate": bool(r["duplicate_of"]),
             "duplicate_of": r["duplicate_of"],
             "event_id": r["event_id"],
+            "comment_count": int(r["comment_count"] or 0),
+            "vote_count": int(r["vote_count"] or 0),
         }
         for r in rows
     ]
@@ -453,12 +472,20 @@ def list_projects(
     team: str | None = None,
     tag: str | None = None,
     event_id: str | None = None,
+    sort: str = Query(default="arrival", description="arrival, newest, title, track, comments, votes"),
     limit: int = Query(default=GALLERY_PAGE_SIZE, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
     items, total = gallery_rows(
-        conn, event_id=event_id, q=q, track=track, team=team, tag=tag,
-        limit=limit, offset=offset,
+        conn,
+        event_id=event_id,
+        q=q,
+        track=track,
+        team=team,
+        tag=tag,
+        sort=sort,
+        limit=limit,
+        offset=offset,
     )
     return {"total": total, "count": len(items), "offset": offset, "projects": items}
 

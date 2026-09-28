@@ -13,28 +13,32 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <header class="top">
-  <div class="wrap bar">
+  <div class="wrap top-shell">
     <a class="brand" href="/" aria-label="Raptors home">
-      <img src="{{ static_url('logo-raptors.svg') }}" alt="Raptors" width="160" height="36">
+      <img class="brand__icon" src="{{ static_url('logo-dino.png') }}" alt="" width="48" height="48" decoding="async">
+      <img class="brand__wordmark" src="{{ static_url('logo-raptors.svg') }}" alt="Raptors" width="160" height="36">
     </a>
-    <nav>
-      <a href="/projects">Gallery</a>
-      <a href="/projects/new">Submit</a>
-      <a href="/teams">Teams</a>
-      <a href="/vote">Vote</a>
-      {% if is_judge %}<a href="/judge">Judge</a>{% endif %}
-      {% if can_aggregate %}<a href="/organizer">Organizer</a>
-      <a href="/organizer/setup">Setup</a>
-      <a href="/organizer/results">Results</a>{% endif %}
-      {% if can_audit %}<a href="/organizer/audit">Audit</a>{% endif %}
-      <a href="/docs">API</a>
-    </nav>
-    <div class="who">
-      {% if who.is_anonymous %}
-        guest &middot; <a href="/login">sign in</a>
-      {% else %}
-        {{ who.name }} &middot; <b>{{ who.role }}</b> &middot; <a href="/login">switch</a>
-      {% endif %}
+    <div class="top-float">
+      <nav>
+        <a href="/projects">Gallery</a>
+        <a href="/projects/new">Submit</a>
+        <a href="/teams">Teams</a>
+        <a href="/vote">Vote</a>
+        {% if is_judge %}<a href="/judge">Judge</a>{% endif %}
+        {% if can_aggregate %}<a href="/organizer">Organizer</a>
+        <a href="/organizer/setup">Setup</a>
+        <a href="/organizer/results">Results</a>{% endif %}
+        {% if can_audit %}<a href="/organizer/audit">Audit</a>{% endif %}
+        <a href="/docs">API</a>
+      </nav>
+      <div class="who">
+        {% if who.is_anonymous %}
+          <a class="btn btn--nav" href="/login">Sign in</a>
+        {% else %}
+          <span class="who__meta">{{ who.name }} &middot; <b>{{ who.role }}</b></span>
+          <a class="btn btn--nav btn--nav-ghost" href="/login">Switch</a>
+        {% endif %}
+      </div>
     </div>
   </div>
 </header>
@@ -45,13 +49,7 @@
   {% block body %}{% endblock %}
 </main>
 
-<footer class="foot wrap">
-  Raptors &middot; DOGFOOD 2026 judging portal &middot; self-hosted &middot;
-  <a href="/openapi.json">OpenAPI</a> &middot;
-  <a href="/api/health">health</a> &middot;
-  <a href="/embed/gallery">embed</a> &middot;
-  <a href="/api/auth/matrix">roles</a>
-</footer>
+{% include "_footer.html" %}
 
 <script>
 async function api(method, url, body) {

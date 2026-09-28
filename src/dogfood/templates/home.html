@@ -72,13 +72,28 @@
 {% endblock %}
 
 {% block body %}
-<p class="section-label">At a glance</p>
-<div class="grid c4">
-  <div class="stat"><div class="n">{{ counts.projects }}</div><div class="k">projects</div></div>
-  <div class="stat"><div class="n">{{ counts.judges }}</div><div class="k">judges</div></div>
-  <div class="stat"><div class="n">{{ counts.scores }}</div><div class="k">ballots cast</div></div>
-  <div class="stat"><div class="n">{{ counts.tracks }}</div><div class="k">tracks</div></div>
-</div>
+<section class="band band--dark" aria-label="At a glance">
+  <div class="band__inner">
+    <p class="section-label">At a glance</p>
+    <div class="grid c4">
+      <div class="stat"><div class="n">{{ counts.projects }}</div><div class="k">projects</div></div>
+      <div class="stat"><div class="n">{{ counts.judges }}</div><div class="k">judges</div></div>
+      <div class="stat"><div class="n">{{ counts.scores }}</div><div class="k">ballots cast</div></div>
+      <div class="stat"><div class="n">{{ counts.tracks }}</div><div class="k">tracks</div></div>
+    </div>
+    <p class="band__quote" style="margin-top:72px">
+      Self-hosted judging for people who compare software, not slideshows.
+    </p>
+    <div class="band__scatter" aria-hidden="true">
+      <span class="s1">Isolation</span>
+      <span class="s2">Calibration</span>
+      <span class="s3">Audit trail</span>
+      <span class="s4">OpenAPI</span>
+      <span class="s5">Fixtures</span>
+      <span class="s6">Role matrix</span>
+    </div>
+  </div>
+</section>
 
 <p class="lede" style="margin-top:36px">
   Submissions closed at <code>{{ event.submissions_close }}</code> on the fixture event.

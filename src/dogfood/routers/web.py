@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -33,6 +34,34 @@ from ..security import Capability, has_capability, judge_record, judge_track_ids
 from .projects import gallery_rows
 
 router = APIRouter(include_in_schema=False)
+
+
+def _gallery_query_string(
+    *,
+    q: str | None = None,
+    track: str | None = None,
+    team: str | None = None,
+    tag: str | None = None,
+    sort: str | None = None,
+    event: str | None = None,
+    page: int | None = None,
+) -> str:
+    parts: dict[str, str | int] = {}
+    if event:
+        parts["event"] = event
+    if q:
+        parts["q"] = q
+    if track:
+        parts["track"] = track
+    if team:
+        parts["team"] = team
+    if tag:
+        parts["tag"] = tag
+    if sort and sort != "arrival":
+        parts["sort"] = sort
+    if page and page > 1:
+        parts["page"] = page
+    return urlencode(parts)
 
 
 def _templates(request: Request) -> Any:
@@ -105,6 +134,7 @@ def gallery(
     track: str | None = Query(default=None),
     team: str | None = Query(default=None),
     tag: str | None = Query(default=None),
+    sort: str = Query(default="arrival"),
     event: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
 ) -> Any:
@@ -116,8 +146,15 @@ def gallery(
     """
     offset = (page - 1) * GALLERY_PAGE_SIZE
     items, total = gallery_rows(
-        conn, event_id=event, q=q, track=track, team=team, tag=tag,
-        limit=GALLERY_PAGE_SIZE, offset=offset,
+        conn,
+        event_id=event,
+        q=q,
+        track=track,
+        team=team,
+        tag=tag,
+        sort=sort,
+        limit=GALLERY_PAGE_SIZE,
+        offset=offset,
     )
     tracks = query(
         conn,
@@ -125,6 +162,35 @@ def gallery(
         "LEFT JOIN projects p ON p.track_id = tr.id AND p.status IN "
         "('submitted','flagged_duplicate') GROUP BY tr.id ORDER BY tr.id",
     )
+    track_rows = [dict(t) for t in tracks]
+    list_qs = _gallery_query_string(
+        q=q, tag=tag, sort=sort, event=event, team=team, track=track
+    )
+    filter_qs = _gallery_query_string(q=q, tag=tag, sort=sort, event=event, team=team)
+    track_nav = [
+        {
+            "id": "",
+            "name": "All tracks",
+            "n": None,
+            "href": "/projects" + (f"?{filter_qs}" if filter_qs else ""),
+            "active": not track,
+        }
+    ]
+    for t in track_rows:
+        if not t["n"]:
+            continue
+        tqs = _gallery_query_string(
+            q=q, tag=tag, sort=sort, event=event, team=team, track=t["id"]
+        )
+        track_nav.append(
+            {
+                "id": t["id"],
+                "name": t["name"],
+                "n": t["n"],
+                "href": f"/projects?{tqs}",
+                "active": track == t["id"],
+            }
+        )
     return _templates(request).TemplateResponse(
         request,
         "gallery.html",
@@ -134,8 +200,17 @@ def gallery(
             "total": total,
             "page": page,
             "page_size": GALLERY_PAGE_SIZE,
-            "filters": {"q": q or "", "track": track or "", "tag": tag or "", "team": team or ""},
-            "tracks": [dict(t) for t in tracks],
+            "filters": {
+                "q": q or "",
+                "track": track or "",
+                "tag": tag or "",
+                "team": team or "",
+                "sort": sort if sort in ("arrival", "newest", "title", "track", "comments", "votes") else "arrival",
+                "event": event or "",
+            },
+            "tracks": track_rows,
+            "track_nav": track_nav,
+            "query_string": list_qs,
         },
     )
 

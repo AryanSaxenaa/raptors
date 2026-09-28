@@ -1,85 +1,157 @@
 {% extends "base.html" %}
 {% block title %}Gallery &middot; Raptors{% endblock %}
+{% block body_class %}page-gallery{% endblock %}
 
 {#
-  Rendered on the server. The acceptance suite fetches this page with no auth
-  header and greps the response body for fixture project titles, so the titles
-  have to be in these bytes -- not fetched by script after load.
-
-  Default order is arrival order and the page size is 200 against 41 fixture
-  projects, so page one is the whole event.
+  Server-rendered titles for acceptance greps. Default sort is arrival; page size 200.
 #}
 
 {% block body %}
-<h1>Project gallery</h1>
-<p class="lede">
-  {{ total }} submitted project{{ '' if total == 1 else 's' }}, in arrival order.
-  Public: no sign-in required.
+<header class="gallery-head">
+  <p class="section-label">Project gallery</p>
+  <h1 class="gallery-head__title">Projects <span class="gallery-head__count">({{ total }})</span></h1>
+  <p class="lede gallery-head__lede">
+    Public submissions — browse, filter, and open any project for comments and community votes.
+    {% if filters.sort == 'arrival' and not filters.q and not filters.track and not filters.tag %}
+      Listed in arrival order.
+    {% endif %}
+  </p>
+</header>
+
+<p class="gallery-callout" role="note">
+  Support builders you like: open a project to comment or cast your vote (one vote per person on the vote page).
 </p>
 
-<form class="panel" method="get" action="/projects">
-  <div class="row">
-    <div>
-      <label for="q">Search</label>
-      <input type="text" id="q" name="q" value="{{ filters.q }}"
-             placeholder="title, summary or description">
-    </div>
-    <div>
-      <label for="track">Track</label>
-      <select id="track" name="track">
-        <option value="">All tracks</option>
-        {% for t in tracks %}
-          <option value="{{ t.id }}" {% if filters.track == t.id %}selected{% endif %}>
-            {{ t.name }} ({{ t.n }})
-          </option>
-        {% endfor %}
+<form class="gallery-toolbar panel" method="get" action="/projects">
+  {% if filters.event %}
+    <input type="hidden" name="event" value="{{ filters.event }}">
+  {% endif %}
+  <div class="gallery-toolbar__row">
+    <label class="gallery-search" for="q">
+      <span class="visually-hidden">Search projects</span>
+      <input type="search" id="q" name="q" value="{{ filters.q }}"
+             placeholder="Search by title, tagline, or description" autocomplete="off">
+    </label>
+    <div class="gallery-toolbar__sort">
+      <label for="sort">Sort</label>
+      <select id="sort" name="sort">
+        <option value="arrival" {% if filters.sort == 'arrival' %}selected{% endif %}>Arrival order</option>
+        <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest first</option>
+        <option value="title" {% if filters.sort == 'title' %}selected{% endif %}>Title A–Z</option>
+        <option value="track" {% if filters.sort == 'track' %}selected{% endif %}>Track</option>
+        <option value="votes" {% if filters.sort == 'votes' %}selected{% endif %}>Most votes</option>
+        <option value="comments" {% if filters.sort == 'comments' %}selected{% endif %}>Most comments</option>
       </select>
     </div>
-    <div>
-      <label for="tag">Tech tag</label>
-      <input type="text" id="tag" name="tag" value="{{ filters.tag }}" placeholder="e.g. python">
-    </div>
-    <div style="flex:0 0 auto; display:flex; align-items:flex-end; gap:8px">
-      <button type="submit">Filter</button>
-      <a class="btn ghost" href="/projects">Reset</a>
+    <div class="gallery-toolbar__actions">
+      <button type="submit">Search</button>
+      <a class="btn ghost" href="/projects{% if filters.event %}?event={{ filters.event|urlencode }}{% endif %}">Reset</a>
     </div>
   </div>
+  {% if filters.track or filters.tag %}
+    <input type="hidden" name="track" value="{{ filters.track }}">
+    <input type="hidden" name="tag" value="{{ filters.tag }}">
+  {% endif %}
 </form>
 
-{% if not projects %}
-  <div class="notice warn">No projects match that filter.</div>
-{% endif %}
-
-<div class="cards">
-  {% for p in projects %}
-    <article class="card">
-      {% if p.thumbnail_url %}
-        <p class="dim"><a href="{{ p.thumbnail_url }}" rel="nofollow noopener">thumbnail</a></p>
-      {% endif %}
-      <h4><a href="/projects/{{ p.id }}">{{ p.title }}</a></h4>
-      <p class="sum">{{ p.summary }}</p>
-      <div class="meta">
-        {{ p.id }} &middot; {{ p.team or 'unknown team' }} &middot; {{ p.track or 'no track' }}
+<div class="gallery-layout">
+  <div class="gallery-main">
+    {% if not projects %}
+      <div class="notice warn">No projects match that filter.</div>
+    {% else %}
+      <div class="gallery-grid">
+        {% for p in projects %}
+          <article class="gallery-card{% if p.is_duplicate %} gallery-card--flagged{% endif %}">
+            {% if p.is_duplicate %}
+              <span class="gallery-card__ribbon warn" title="Possible duplicate of {{ p.duplicate_of }}">Flagged</span>
+            {% endif %}
+            <a class="gallery-card__hit" href="/projects/{{ p.id }}">
+              <div class="gallery-card__media">
+                {% if p.thumbnail_url %}
+                  <img src="{{ p.thumbnail_url }}" alt="" loading="lazy" decoding="async">
+                {% else %}
+                  <span class="gallery-card__glyph" aria-hidden="true">{{ p.title[:1] }}</span>
+                {% endif %}
+              </div>
+              <div class="gallery-card__body">
+                <div class="gallery-card__top">
+                  <div>
+                    <h2 class="gallery-card__title">{{ p.title }}</h2>
+                    {% if p.team %}
+                      <p class="gallery-card__by">By {{ p.team }}</p>
+                    {% endif %}
+                  </div>
+                  <div class="gallery-card__stats" aria-label="Engagement">
+                    <span class="gallery-stat" title="Community votes"><span class="gallery-stat__n">{{ p.vote_count }}</span> votes</span>
+                    <span class="gallery-stat" title="Comments"><span class="gallery-stat__n">{{ p.comment_count }}</span> comments</span>
+                  </div>
+                </div>
+                {% if p.summary %}
+                  <p class="gallery-card__sum">{{ p.summary }}</p>
+                {% endif %}
+                {% if p.tech_tags or p.repo_url or p.live_url %}
+                  <div class="gallery-card__tags tags">
+                    {% for tag in p.tech_tags %}<span class="badge">{{ tag }}</span>{% endfor %}
+                    {% if p.repo_url %}<span class="badge">repo</span>{% endif %}
+                    {% if p.live_url %}<span class="badge">demo</span>{% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            </a>
+            <footer class="gallery-card__foot">
+              {% if p.track %}
+                <span class="gallery-track">{{ p.track }}</span>
+              {% else %}
+                <span class="dim">No track</span>
+              {% endif %}
+              <span class="gallery-card__id dim">{{ p.id }}</span>
+            </footer>
+          </article>
+        {% endfor %}
       </div>
-      <div class="tags">
-        {% if p.is_duplicate %}
-          {# Flagged by the importer, shown rather than hidden: an organizer
-             needs to see it, and dropping it would lose data. #}
-          <span class="badge warn" title="Duplicate of {{ p.duplicate_of }}">possible duplicate</span>
+    {% endif %}
+
+    {% if total > page_size %}
+      {% set base_qs = query_string %}
+      <nav class="gallery-pager panel" aria-label="Gallery pages">
+        <span class="dim">Page {{ page }} of {{ (total + page_size - 1) // page_size }}</span>
+        {% if page > 1 %}
+          {% set prev_qs = base_qs ~ ('&' if base_qs else '') ~ 'page=' ~ (page - 1) %}
+          <a class="btn ghost" href="/projects?{{ prev_qs }}">Previous</a>
         {% endif %}
-        {% for tag in p.tech_tags %}<span class="badge">{{ tag }}</span>{% endfor %}
-        {% if p.repo_url %}<a class="badge" href="{{ p.repo_url }}" rel="nofollow noopener">repo</a>{% endif %}
-        {% if p.live_url %}<a class="badge" href="{{ p.live_url }}" rel="nofollow noopener">demo</a>{% endif %}
-      </div>
-    </article>
-  {% endfor %}
-</div>
-
-{% if total > page_size %}
-  <div class="panel" style="margin-top:18px; display:flex; gap:12px; align-items:center">
-    <span class="dim">page {{ page }} of {{ (total // page_size) + 1 }}</span>
-    {% if page > 1 %}<a class="btn ghost" href="?page={{ page - 1 }}">Previous</a>{% endif %}
-    {% if page * page_size < total %}<a class="btn ghost" href="?page={{ page + 1 }}">Next</a>{% endif %}
+        {% if page * page_size < total %}
+          {% set next_qs = base_qs ~ ('&' if base_qs else '') ~ 'page=' ~ (page + 1) %}
+          <a class="btn ghost" href="/projects?{{ next_qs }}">Next</a>
+        {% endif %}
+      </nav>
+    {% endif %}
   </div>
-{% endif %}
+
+  <aside class="gallery-aside panel" aria-labelledby="filter-heading">
+    <h2 id="filter-heading" class="gallery-aside__title">Filter submissions</h2>
+
+    <div class="gallery-filter-block">
+      <p class="gallery-filter-block__label">Track</p>
+      <ul class="gallery-track-list">
+        {% for t in track_nav %}
+          <li>
+            <a class="gallery-track-link{% if t.active %} is-active{% endif %}" href="{{ t.href }}">
+              {{ t.name }}{% if t.n is not none %} <span class="dim">({{ t.n }})</span>{% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <form class="gallery-filter-block" method="get" action="/projects">
+      {% if filters.event %}<input type="hidden" name="event" value="{{ filters.event }}">{% endif %}
+      {% if filters.q %}<input type="hidden" name="q" value="{{ filters.q }}">{% endif %}
+      {% if filters.track %}<input type="hidden" name="track" value="{{ filters.track }}">{% endif %}
+      {% if filters.sort != 'arrival' %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+      <label for="tag">Tech tag</label>
+      <input type="text" id="tag" name="tag" value="{{ filters.tag }}" placeholder="e.g. python">
+      <button type="submit" class="gallery-filter-submit">Apply tag</button>
+    </form>
+  </aside>
+</div>
 {% endblock %}
