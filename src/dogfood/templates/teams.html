@@ -1,64 +1,71 @@
 {% extends "base.html" %}
 {% block title %}Teams &middot; Raptors{% endblock %}
+{% block body_class %}page-teams{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ static_url('field-station-pages.css') }}">
+{% endblock %}
 
 {% block body %}
-<h1>Teams</h1>
-<p class="lede">
-  Create a team or join with an invite code before submitting a project.
-  Writes go through the same JSON API as external clients.
-</p>
+<header class="fs-page-head workspace-head">
+  <p class="fs-eyebrow">SITE 04 · TEAMS</p>
+  <h1>Teams</h1>
+  <p class="lede">
+    Create a team or join with an invite code before submitting a project.
+    Writes go through the same JSON API as external clients.
+  </p>
+</header>
 
-<form class="panel" method="get" action="/teams" style="display:flex; gap:12px; align-items:flex-end">
-  <div style="flex:1">
-    <label for="event">Event</label>
-    <select id="event" name="event" onchange="this.form.submit()">
-      {% for e in events %}
-        <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
+<form class="fs-event-row" method="get" action="/teams">
+  <label for="event">Event</label>
+  <select id="event" name="event" onchange="this.form.submit()">
+    {% for e in events %}
+      <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
+    {% endfor %}
+  </select>
 </form>
 
 <div id="flash" class="notice" hidden></div>
 
 {% if who.is_anonymous %}
-  <div class="notice bad"><a href="/login">Sign in</a> as a participant to create or join a team.</div>
+  <div class="fs-banner"><a href="/login">Sign in</a> as a participant to create or join a team.</div>
 {% else %}
-  <div class="grid c2">
-    <div class="panel">
+  <div class="fs-split">
+    <div class="fs-split__col">
       <h3>Create a team</h3>
       <label for="team-name">Display name</label>
       <input id="team-name" placeholder="Team name">
-      <div style="margin-top:14px"><button id="create-team">Create team</button></div>
-      <p class="sum" style="margin-top:12px">Duplicate names are allowed; identity is the team id.</p>
+      <div style="margin-top:14px"><button id="create-team" type="button">Create team</button></div>
+      <p class="sum">Duplicate names are allowed; identity is the team id.</p>
     </div>
-    <div class="panel">
+    <div class="fs-split__or" aria-hidden="true">or</div>
+    <div class="fs-split__col">
       <h3>Join with invite code</h3>
       <label for="invite">Invite code</label>
       <input id="invite" placeholder="paste code from invite link" value="{{ invite_prefill }}">
-      <div style="margin-top:14px"><button id="join-team">Join team</button></div>
+      <div style="margin-top:14px"><button id="join-team" type="button">Join team</button></div>
     </div>
   </div>
 
-  <h2>Your teams on this event</h2>
-  <div class="panel">
-    {% if my_teams %}
-      <table>
-        <thead><tr><th>Name</th><th>Team id</th><th></th></tr></thead>
-        <tbody>
-          {% for t in my_teams %}
-            <tr>
-              <td>{{ t.name }}</td>
-              <td class="mono">{{ t.id }}</td>
-              <td><a href="/projects/new?event={{ event.id }}">Submit a project</a></td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="sum">You are not on a team for this event yet.</p>
-    {% endif %}
-  </div>
+  <h2 class="fs-teams-head">Your teams on this event</h2>
+  {% if my_teams %}
+    <table class="fs-teams-table data">
+      <thead><tr><th>Name</th><th>Team id</th><th></th></tr></thead>
+      <tbody>
+        {% for t in my_teams %}
+          <tr>
+            <td>{{ t.name }}</td>
+            <td class="mono">{{ t.id }}</td>
+            <td><a href="/projects/new?event={{ event.id }}">Submit a project</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="fs-empty-team">
+      <img src="{{ static_url('logo-dino.png') }}" alt="" width="40" height="40" decoding="async">
+      <p>You are not on a team for this event yet.</p>
+    </div>
+  {% endif %}
 {% endif %}
 {% endblock %}
 

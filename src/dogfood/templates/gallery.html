@@ -1,28 +1,82 @@
 {% extends "base.html" %}
 {% block title %}Gallery &middot; Raptors{% endblock %}
 {% block body_class %}page-gallery{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ static_url('field-station-pages.css') }}">
+{% endblock %}
+
+{% block atmosphere %}
+<div class="fx-ornament fx-ornament--br" aria-hidden="true">
+  <canvas data-fx="grid"></canvas>
+</div>
+{% endblock %}
 
 {#
   Server-rendered titles for acceptance greps. Default sort is arrival; page size 200.
+  Community vote controls sit on each card. Ballot shuffle stays on the API —
+  this listing is never reordered to match a voter's ballot.
 #}
 
 {% block body %}
-<header class="gallery-head">
-  <p class="section-label">Project gallery</p>
+<header class="fs-page-head gallery-head">
+  <p class="fs-eyebrow">SITE 02 · GALLERY</p>
   <h1 class="gallery-head__title">Projects <span class="gallery-head__count">({{ total }})</span></h1>
   <p class="lede gallery-head__lede">
-    Public submissions — browse, filter, and open any project for comments and community votes.
+    Public submissions — browse, filter, comment, and spend quadratic credits from this page.
     {% if filters.sort == 'arrival' and not filters.q and not filters.track and not filters.tag %}
       Listed in arrival order.
     {% endif %}
   </p>
 </header>
 
-<p class="gallery-callout" role="note">
-  Support builders you like: open a project to comment or cast your vote (one vote per person on the vote page).
-</p>
+<section class="fs-vote-intro" id="community-vote" aria-labelledby="community-vote-heading">
+  <p class="section-label">Community vote</p>
+  <h2 id="community-vote-heading">Quadratic credits</h2>
+  <p class="fs-vote-intro__lede">
+    Spend up to <b>{{ credit_budget }}</b> credits across projects for
+    <b>{{ vote_event.name }}</b>. Influence on each project is the square root of
+    credits you assign there, so piling the budget on one favourite buys less
+    and less. Ballot order is shuffled per voter on the API; this gallery stays
+    in listing order.
+  </p>
+  <form class="fs-vote-event" method="get" action="/projects">
+    {% if filters.q %}<input type="hidden" name="q" value="{{ filters.q }}">{% endif %}
+    {% if filters.track %}<input type="hidden" name="track" value="{{ filters.track }}">{% endif %}
+    {% if filters.tag %}<input type="hidden" name="tag" value="{{ filters.tag }}">{% endif %}
+    {% if filters.sort != 'arrival' %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+    <label for="vote-event">Event</label>
+    <select id="vote-event" name="event" onchange="this.form.submit()">
+      {% for e in events %}
+        <option value="{{ e.id }}" {% if e.id == vote_event.id %}selected{% endif %}>{{ e.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <div class="fs-credit-strip" aria-live="polite">
+    <div class="fs-credit-strip__track">
+      <span class="fs-credit-strip__fill" id="credit-fill"></span>
+    </div>
+    <p class="fs-credit-strip__label ballot-budget" id="budget">
+      {% if who.is_anonymous %}
+        <a href="/login">Sign in</a> to spend quadratic credits on projects.
+      {% else %}
+        Loading your credit budget…
+      {% endif %}
+    </p>
+  </div>
+  <div id="flash" class="notice" hidden></div>
+  <p class="fs-vote-note sum">
+    {% if show_vote_tallies %}
+      Vote tallies are visible because results are published, or you are an organizer.
+    {% else %}
+      Community tallies stay embargoed until the organizer publishes.
+      Organizers can inspect them at <code>/api/events/{{ vote_event.id }}/vote-results</code>.
+    {% endif %}
+  </p>
+</section>
 
-<form class="gallery-toolbar panel" method="get" action="/projects">
+<hr class="fs-hairline" aria-hidden="true">
+
+<form class="fs-toolbar gallery-toolbar" method="get" action="/projects">
   {% if filters.event %}
     <input type="hidden" name="event" value="{{ filters.event }}">
   {% endif %}
@@ -39,7 +93,9 @@
         <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest first</option>
         <option value="title" {% if filters.sort == 'title' %}selected{% endif %}>Title A–Z</option>
         <option value="track" {% if filters.sort == 'track' %}selected{% endif %}>Track</option>
-        <option value="votes" {% if filters.sort == 'votes' %}selected{% endif %}>Most votes</option>
+        {% if show_vote_tallies %}
+          <option value="votes" {% if filters.sort == 'votes' %}selected{% endif %}>Most votes</option>
+        {% endif %}
         <option value="comments" {% if filters.sort == 'comments' %}selected{% endif %}>Most comments</option>
       </select>
     </div>
@@ -54,25 +110,43 @@
   {% endif %}
 </form>
 
-<div class="gallery-layout">
+<nav class="fs-track-chips" aria-label="Filter by track">
+  <span class="fs-track-chips__label">Track</span>
+  {% for t in track_nav %}
+    <a class="fs-chip{% if t.active %} is-active{% endif %}" href="{{ t.href }}">
+      {{ t.name }}{% if t.n is not none %} ({{ t.n }}){% endif %}
+    </a>
+  {% endfor %}
+</nav>
+
+<form class="fs-tag-filter" method="get" action="/projects">
+  {% if filters.event %}<input type="hidden" name="event" value="{{ filters.event }}">{% endif %}
+  {% if filters.q %}<input type="hidden" name="q" value="{{ filters.q }}">{% endif %}
+  {% if filters.track %}<input type="hidden" name="track" value="{{ filters.track }}">{% endif %}
+  {% if filters.sort != 'arrival' %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+  <label for="tag">Tech tag</label>
+  <input type="text" id="tag" name="tag" value="{{ filters.tag }}" placeholder="e.g. python">
+  <button type="submit" class="ghost">Apply tag</button>
+</form>
+
+<div class="fs-layout-single gallery-layout">
   <div class="gallery-main">
     {% if not projects %}
       <div class="notice warn">No projects match that filter.</div>
     {% else %}
       <div class="gallery-grid">
         {% for p in projects %}
-          <article class="gallery-card{% if p.is_duplicate %} gallery-card--flagged{% endif %}">
+          <article class="gallery-card{% if p.is_duplicate %} gallery-card--flagged{% endif %}{% if not p.thumbnail_url %} gallery-card--no-thumb{% endif %}"
+                   data-project-id="{{ p.id }}" data-event-id="{{ p.event_id }}">
             {% if p.is_duplicate %}
               <span class="gallery-card__ribbon warn" title="Possible duplicate of {{ p.duplicate_of }}">Flagged</span>
             {% endif %}
             <a class="gallery-card__hit" href="/projects/{{ p.id }}">
+              {% if p.thumbnail_url %}
               <div class="gallery-card__media">
-                {% if p.thumbnail_url %}
                   <img src="{{ p.thumbnail_url }}" alt="" loading="lazy" decoding="async">
-                {% else %}
-                  <span class="gallery-card__glyph" aria-hidden="true">{{ p.title[:1] }}</span>
-                {% endif %}
               </div>
+              {% endif %}
               <div class="gallery-card__body">
                 <div class="gallery-card__top">
                   <div>
@@ -82,7 +156,9 @@
                     {% endif %}
                   </div>
                   <div class="gallery-card__stats" aria-label="Engagement">
-                    <span class="gallery-stat" title="Community votes"><span class="gallery-stat__n">{{ p.vote_count }}</span> votes</span>
+                    {% if show_vote_tallies %}
+                      <span class="gallery-stat" title="Community votes"><span class="gallery-stat__n">{{ p.vote_count }}</span> votes</span>
+                    {% endif %}
                     <span class="gallery-stat" title="Comments"><span class="gallery-stat__n">{{ p.comment_count }}</span> comments</span>
                   </div>
                 </div>
@@ -106,6 +182,25 @@
               {% endif %}
               <span class="gallery-card__id dim">{{ p.id }}</span>
             </footer>
+            {% if p.event_id == vote_event.id and not p.is_duplicate %}
+              {% if who.is_anonymous %}
+                <div class="gallery-card__vote gallery-card__vote--locked">
+                  <a class="btn ghost" href="/login">Sign in to vote</a>
+                </div>
+              {% else %}
+              <div class="gallery-card__vote fs-vote-stepper">
+                <span class="gallery-card__spent dim" data-spent="{{ p.id }}">Your credits: 0</span>
+                <div class="fs-stepper-row">
+                  <button type="button" class="fs-stepper-btn" data-step="-1" data-project="{{ p.id }}" aria-label="Fewer credits">−</button>
+                  <label class="visually-hidden" for="credits-{{ p.id }}">Credits for {{ p.title }}</label>
+                  <input type="number" class="ballot-credits fs-stepper-input" id="credits-{{ p.id }}"
+                         min="1" max="{{ credit_budget }}" value="1" data-project="{{ p.id }}">
+                  <button type="button" class="fs-stepper-btn" data-step="1" data-project="{{ p.id }}" aria-label="More credits">+</button>
+                  <button type="button" class="fs-vote-btn" data-vote="{{ p.id }}">Cast vote</button>
+                </div>
+              </div>
+              {% endif %}
+            {% endif %}
           </article>
         {% endfor %}
       </div>
@@ -113,7 +208,7 @@
 
     {% if total > page_size %}
       {% set base_qs = query_string %}
-      <nav class="gallery-pager panel" aria-label="Gallery pages">
+      <nav class="gallery-pager fs-pager" aria-label="Gallery pages">
         <span class="dim">Page {{ page }} of {{ (total + page_size - 1) // page_size }}</span>
         {% if page > 1 %}
           {% set prev_qs = base_qs ~ ('&' if base_qs else '') ~ 'page=' ~ (page - 1) %}
@@ -126,32 +221,83 @@
       </nav>
     {% endif %}
   </div>
-
-  <aside class="gallery-aside panel" aria-labelledby="filter-heading">
-    <h2 id="filter-heading" class="gallery-aside__title">Filter submissions</h2>
-
-    <div class="gallery-filter-block">
-      <p class="gallery-filter-block__label">Track</p>
-      <ul class="gallery-track-list">
-        {% for t in track_nav %}
-          <li>
-            <a class="gallery-track-link{% if t.active %} is-active{% endif %}" href="{{ t.href }}">
-              {{ t.name }}{% if t.n is not none %} <span class="dim">({{ t.n }})</span>{% endif %}
-            </a>
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-
-    <form class="gallery-filter-block" method="get" action="/projects">
-      {% if filters.event %}<input type="hidden" name="event" value="{{ filters.event }}">{% endif %}
-      {% if filters.q %}<input type="hidden" name="q" value="{{ filters.q }}">{% endif %}
-      {% if filters.track %}<input type="hidden" name="track" value="{{ filters.track }}">{% endif %}
-      {% if filters.sort != 'arrival' %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
-      <label for="tag">Tech tag</label>
-      <input type="text" id="tag" name="tag" value="{{ filters.tag }}" placeholder="e.g. python">
-      <button type="submit" class="gallery-filter-submit">Apply tag</button>
-    </form>
-  </aside>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if not who.is_anonymous %}
+<script>
+const eventId = {{ vote_event.id | tojson }};
+const creditBudget = {{ credit_budget | tojson }};
+
+function spentLabel(root, projectId, credits) {
+  const el = root.querySelector('[data-spent="' + projectId + '"]');
+  if (el) el.textContent = 'Your credits: ' + String(credits);
+}
+
+function updateCreditStrip(spent, budget) {
+  const fill = document.getElementById('credit-fill');
+  if (fill && budget > 0) {
+    fill.style.width = Math.min(100, (100 * spent / budget)).toFixed(1) + '%';
+  }
+}
+
+async function loadBallot() {
+  const ballot = await api('GET', '/api/events/' + eventId + '/ballot');
+  const budget = document.getElementById('budget');
+  budget.textContent =
+    'Mode: ' + ballot.voter_mode + ' · spent ' + ballot.credits_spent +
+    ' / ' + ballot.credit_budget + ' credits · remaining ' + ballot.credits_remaining;
+  updateCreditStrip(ballot.credits_spent, ballot.credit_budget);
+  const grid = document.querySelector('.gallery-grid');
+  if (!grid) return;
+  ballot.projects.forEach(function (p) {
+    spentLabel(grid, p.id, p.my_credits || 0);
+    const input = grid.querySelector('input.ballot-credits[data-project="' + p.id + '"]');
+    if (input && p.my_credits) input.value = String(p.my_credits);
+  });
+}
+
+function stepCredits(projectId, delta) {
+  const input = document.querySelector('input.ballot-credits[data-project="' + projectId + '"]');
+  if (!input) return;
+  const max = parseInt(input.max, 10) || creditBudget;
+  const min = parseInt(input.min, 10) || 1;
+  let v = parseInt(input.value, 10) || min;
+  v = Math.max(min, Math.min(max, v + delta));
+  input.value = String(v);
+}
+
+document.querySelectorAll('[data-step]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    const projectId = btn.getAttribute('data-project');
+    const delta = parseInt(btn.getAttribute('data-step'), 10) || 0;
+    stepCredits(projectId, delta);
+  });
+});
+
+document.querySelectorAll('[data-vote]').forEach(function (btn) {
+  btn.addEventListener('click', async function () {
+    const projectId = btn.getAttribute('data-vote');
+    const input = document.querySelector('input.ballot-credits[data-project="' + projectId + '"]');
+    const credits = parseInt(input && input.value, 10) || 1;
+    btn.disabled = true;
+    try {
+      await api('POST', '/api/events/' + eventId + '/votes', {
+        project_id: projectId,
+        credits: credits,
+      });
+      flash('Vote recorded.', 'ok');
+      await loadBallot();
+    } catch (e) {
+      flash(e.message, 'bad');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+});
+
+loadBallot().catch(function (e) { flash(e.message, 'bad'); });
+</script>
+{% endif %}
 {% endblock %}

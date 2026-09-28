@@ -2,11 +2,13 @@
 {% block title %}Organizer &middot; Raptors{% endblock %}
 
 {% block body %}
-<h1>Organizer console</h1>
-<p class="lede">
-  {{ event.name }} &middot; <span class="mono">{{ event.id }}</span> &middot;
-  target {{ progress.reviews_per_project }} reviews per project.
-</p>
+<header class="workspace-head">
+  <h1>Organizer console</h1>
+  <p class="lede">
+    {{ event.name }} &middot; <span class="mono">{{ event.id }}</span> &middot;
+    target {{ progress.reviews_per_project }} reviews per project.
+  </p>
+</header>
 
 <div id="flash" class="notice" hidden></div>
 

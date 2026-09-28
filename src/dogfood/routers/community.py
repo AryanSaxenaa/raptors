@@ -148,6 +148,7 @@ def get_ballot(
     request: Request, conn: Conn, who: Who, event_id: str,
     email: str | None = Query(default=None),
 ) -> dict[str, Any]:
+    require_operation(conn, who, Operation.VOTE)
     event = get_event(conn, event_id)
     key, mode = _voter_key(request, who, event, email)
 
@@ -171,6 +172,16 @@ def get_ballot(
         "SELECT COALESCE(SUM(credits), 0) AS n FROM votes WHERE event_id = ? AND voter_key = ?",
         (event_id, key),
     )["n"]
+    mine = {
+        row["project_id"]: int(row["credits"])
+        for row in query(
+            conn,
+            "SELECT project_id, credits FROM votes WHERE event_id = ? AND voter_key = ?",
+            (event_id, key),
+        )
+    }
+    for item in items:
+        item["my_credits"] = mine.get(item["id"], 0)
     return {
         "event_id": event_id,
         "voter_mode": mode,
@@ -187,6 +198,7 @@ def get_ballot(
 def post_vote(
     request: Request, conn: Conn, who: Who, event_id: str, body: VoteIn
 ) -> dict[str, Any]:
+    require_operation(conn, who, Operation.VOTE)
     event = get_event(conn, event_id)
     _voting_open(conn, event, who)
 

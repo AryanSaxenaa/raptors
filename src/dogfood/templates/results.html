@@ -8,12 +8,14 @@
 #}
 
 {% block body %}
-<h1>Normalized results</h1>
-<p class="lede">
-  {{ result.observations }} ballots from {{ result.judges | length }} judges over
-  {{ leaderboard | length }} ranked projects. Method
-  <span class="mono">{{ method }}</span>.
-</p>
+<header class="workspace-head">
+  <h1>Normalized results</h1>
+  <p class="lede">
+    {{ result.observations }} ballots from {{ result.judges | length }} judges over
+    {{ leaderboard | length }} ranked projects. Method
+    <span class="mono">{{ method }}</span>.
+  </p>
+</header>
 
 <form method="get" action="/organizer/results" class="panel"
       style="display:flex; gap:12px; align-items:flex-end">

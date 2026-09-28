@@ -2,12 +2,14 @@
 {% block title %}Audit trail &middot; Raptors{% endblock %}
 
 {% block body %}
-<h1>Audit trail</h1>
-<p class="lede">
-  Append-only and hash-chained: each entry's hash covers the previous entry's
-  hash, so a deleted or edited row breaks verification at that point instead of
-  disappearing quietly.
-</p>
+<header class="workspace-head">
+  <h1>Audit trail</h1>
+  <p class="lede">
+    Append-only and hash-chained: each entry's hash covers the previous entry's
+    hash, so a deleted or edited row breaks verification at that point instead of
+    disappearing quietly.
+  </p>
+</header>
 
 <div class="panel">
   {% if chain.ok %}

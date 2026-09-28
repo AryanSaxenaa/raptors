@@ -2,11 +2,13 @@
 {% block title %}Event setup &middot; Raptors{% endblock %}
 
 {% block body %}
-<h1>Event setup</h1>
-<p class="lede">
-  Configure events, tracks, and judges from the UI. Every action below calls the
-  public JSON API documented at <a href="/docs">/docs</a>.
-</p>
+<header class="workspace-head">
+  <h1>Event setup</h1>
+  <p class="lede">
+    Configure events, tracks, and judges from the UI. Every action below calls the
+    public JSON API documented at <a href="/docs">/docs</a>.
+  </p>
+</header>
 
 <form class="panel" method="get" action="/organizer/setup" style="display:flex; gap:12px; align-items:flex-end">
   <div style="flex:1">

@@ -1,105 +1,113 @@
 {% extends "base.html" %}
 {% block title %}Sign in &middot; Raptors{% endblock %}
+{% block body_class %}page-login{% endblock %}
+
+{% block atmosphere %}
+<div class="fx-stage fx-stage--page" aria-hidden="true">
+  <canvas data-fx="grid"></canvas>
+</div>
+{% endblock %}
 
 {% block body %}
-<h1>Sign in</h1>
-<p class="lede">
-  Real password login, and the seeded development sessions the acceptance suite
-  uses. One credential type: the token below works as either
-  <code>Cookie: df_session=…</code> or <code>Authorization: Bearer …</code>.
-</p>
+<div class="login-page">
+  <div class="login-card">
+    <a class="login-card__brand" href="/" aria-label="Raptors home">
+      <img src="{{ static_url('logo-raptors.svg') }}" alt="Raptors" width="140" height="32">
+    </a>
 
-<div class="grid c2">
-  <div class="panel">
-    <h3>Password</h3>
-    <div id="flash" class="notice" hidden></div>
-    <label for="email">Email</label>
-    <input type="email" id="email" placeholder="organizer@dogfood.local">
-    <label for="password">Password</label>
-    <input type="password" id="password" placeholder="dogfood">
-    <div style="margin-top:16px"><button id="signin">Sign in</button></div>
-    <p class="sum" style="margin-top:14px">
-      Seeded accounts all use the password <code>dogfood</code>. Hashes are
-      scrypt with a per-user salt; see <code>security.py</code>.
-    </p>
+    {% if not who.is_anonymous %}
+      <p class="login-card__signed-in">
+        Signed in as <strong>{{ who.name }}</strong> ({{ who.role }}).
+      </p>
+      <button type="button" class="login-card__submit" id="signout">Sign out</button>
+      <p class="login-card__footer">
+        <a href="/projects">Continue to gallery</a>
+      </p>
+    {% else %}
+      <h1 class="login-card__title">Sign in</h1>
+      <p class="login-card__sub">Use your email and password to access voting, teams, and submissions.</p>
+
+      <div id="flash" class="notice login-card__flash" hidden></div>
+
+      <form class="login-card__form" id="login-form" onsubmit="return false">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com"
+               autocomplete="username" required>
+
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Your password"
+               autocomplete="current-password" required>
+
+        <button type="submit" class="login-card__submit" id="signin">Sign in</button>
+      </form>
+
+      {% if settings.dev_tokens %}
+        <p class="login-card__hint">
+          Demo accounts use the password <code>dogfood</code> (for example
+          <span class="mono">organizer@dogfood.local</span>).
+        </p>
+      {% endif %}
+    {% endif %}
   </div>
 
-  {% if settings.dev_tokens %}
-  <div class="panel">
-    <h3>Seeded sessions</h3>
-    <p class="sum">
-      These are the headers in <code>.dogfood.toml</code>. They are fixed rather
-      than random so a committed acceptance report stays reproducible, which is
-      also why they are gated behind <code>DOGFOOD_DEV_TOKENS</code> and warned
-      about at boot.
-    </p>
-    <div class="scroll"><table>
-      <thead><tr><th>Role</th><th>Account</th><th>Header</th><th></th></tr></thead>
-      <tbody>
+  {% if settings.dev_tokens and who.is_anonymous %}
+    <section class="login-dev" aria-labelledby="login-dev-heading">
+      <h2 id="login-dev-heading" class="login-dev__title">Development quick sign-in</h2>
+      <p class="login-dev__sub">Fixed session tokens for local review and acceptance tests.</p>
+      <ul class="login-dev__list">
         {% for l in seeded_logins %}
-          <tr>
-            <td><span class="badge">{{ l.label }}</span></td>
-            <td>{{ l.name }}<div class="dim mono">{{ l.email }}</div></td>
-            <td class="mono">Cookie: df_session={{ l.token }}</td>
-            <td><button class="ghost" data-token="{{ l.token }}">Use</button></td>
-          </tr>
+          <li>
+            <a class="login-dev__btn" href="/login/as/{{ l.label }}">
+              <span class="login-dev__role">{{ l.label }}</span>
+              <span class="login-dev__name">{{ l.name }}</span>
+            </a>
+          </li>
         {% endfor %}
-      </tbody>
-    </table></div>
-    {% if not who.is_anonymous %}
-      <div style="margin-top:14px"><button id="signout" class="ghost">Sign out</button></div>
-    {% endif %}
-  </div>
-  {% else %}
-  <div class="panel">
-    <p class="sum">Dev session tokens are disabled (<code>DOGFOOD_DEV_TOKENS=0</code>). Use email and password only.</p>
-    {% if not who.is_anonymous %}
-      <div style="margin-top:14px"><button id="signout" class="ghost">Sign out</button></div>
-    {% endif %}
-  </div>
+      </ul>
+    </section>
   {% endif %}
-</div>
 
-<div class="panel">
-  <h3>The same thing from a terminal</h3>
-  <pre class="block">
-# public, no credential
+  <details class="login-advanced">
+    <summary>API examples for reviewers</summary>
+    <pre class="login-code"># public gallery (no credential)
 curl -s localhost:8080/projects | grep -o 'Glass Signal'
 
-# a judge reading their own ballots
+# judge reads own scores
 curl -s -H 'Cookie: df_session=jdg_a_91bc' localhost:8080/api/judge/scores
 
-# the other judge trying the same url: 403, and an audit entry
+# peer access denied (403) + audit entry
 curl -s -o /dev/null -w '%{http_code}\n' \
   -H 'Cookie: df_session=jdg_b_44de' 'localhost:8080/api/judge/scores?judge=jdg_01'
 
-# the organizer on that same url: 200, because they hold peer_scores
+# organizer may read peer scores
 curl -s -o /dev/null -w '%{http_code}\n' \
   -H 'Cookie: df_session=org_7f2a' 'localhost:8080/api/judge/scores?judge=jdg_01'</pre>
+  </details>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.querySelectorAll('button[data-token]').forEach(b => {
-  b.addEventListener('click', () => {
-    document.cookie = 'df_session=' + b.dataset.token + '; path=/; samesite=lax';
-    location.href = '/';
+var form = document.getElementById('login-form');
+if (form) {
+  form.addEventListener('submit', async function () {
+    var signin = document.getElementById('signin');
+    signin.disabled = true;
+    try {
+      await api('POST', '/api/auth/login', {
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+      });
+      location.href = '/';
+    } catch (e) {
+      flash(e.message, 'bad');
+      signin.disabled = false;
+    }
   });
-});
+}
 
-document.getElementById('signin').addEventListener('click', async () => {
-  try {
-    await api('POST', '/api/auth/login', {
-      email: document.getElementById('email').value.trim(),
-      password: document.getElementById('password').value,
-    });
-    location.href = '/';
-  } catch (e) { flash(e.message, 'bad'); }
-});
-
-const out = document.getElementById('signout');
-if (out) out.addEventListener('click', async () => {
+var out = document.getElementById('signout');
+if (out) out.addEventListener('click', async function () {
   await api('POST', '/api/auth/logout');
   location.href = '/login';
 });

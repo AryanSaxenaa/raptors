@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Judge console &middot; Raptors{% endblock %}
-
-{#
-  Five hours to score thirty projects is a UX problem before it is anything
-  else, so the queue sorts unscored first and every row is one click from a
-  ballot.
-#}
+{% block body_class %}page-judge{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ static_url('field-station-pages.css') }}">
+{% endblock %}
 
 {% block body %}
-<h1>Judge console</h1>
+<header class="fs-page-head workspace-head">
+  <p class="fs-eyebrow">SITE 03 · JUDGE</p>
+  <h1>Judge console</h1>
 
 {% if not judge %}
   <div class="notice warn">
@@ -23,23 +23,36 @@
     You can only see projects in your own tracks &mdash; that is enforced in the
     backend, by <code>assert_track_visible</code>, not by this page.
   </p>
+{% endif %}
+</header>
 
+{% if judge %}
   {% set done = queue | selectattr('scored') | list | length %}
-  <div class="grid c3">
-    <div class="stat"><div class="n">{{ queue | length }}</div><div class="k">assigned</div></div>
-    <div class="stat"><div class="n">{{ done }}</div><div class="k">scored</div></div>
-    <div class="stat"><div class="n">{{ (queue | length) - done }}</div><div class="k">remaining</div></div>
+  {% set total = queue | length %}
+  <div class="fs-stats-strip">
+    <div class="fs-stats-strip__item">
+      <div class="fs-stats-strip__n">{{ total }}</div>
+      <div class="fs-stats-strip__k">assigned</div>
+    </div>
+    <div class="fs-stats-strip__item">
+      <div class="fs-stats-strip__n">{{ done }}</div>
+      <div class="fs-stats-strip__k">scored</div>
+    </div>
+    <div class="fs-stats-strip__item">
+      <div class="fs-stats-strip__n">{{ total - done }}</div>
+      <div class="fs-stats-strip__k">remaining</div>
+    </div>
   </div>
 
-  {% if queue %}
-    <div class="bar-track" style="margin:16px 0">
-      <div class="bar-fill" style="width: {{ (100 * done / (queue | length)) | round(1) }}%"></div>
+  {% if total %}
+    <div class="fs-progress" role="progressbar" aria-valuenow="{{ done }}" aria-valuemin="0" aria-valuemax="{{ total }}">
+      <div class="fs-progress__fill" style="width: {{ (100 * done / total) | round(1) }}%"></div>
     </div>
   {% endif %}
 
-  <h2>Your queue</h2>
-  <div class="panel scroll">
-    <table>
+  <h2 class="fs-queue-head">Your queue</h2>
+  <div class="scroll">
+    <table class="fs-queue-table">
       <thead><tr>
         <th>Project</th><th>Tagline</th><th>Track</th><th>Links</th><th></th>
       </tr></thead>
@@ -69,14 +82,14 @@
     </table>
   </div>
 
-  <div class="panel">
+  <div class="fs-note">
     <h3>Participation record</h3>
     <p class="sum">Hash-anchored JSON statement of reviews completed on this event.</p>
     <button id="cert" class="ghost" type="button">Download judge record</button>
     <pre id="cert-out" class="block" hidden></pre>
   </div>
 
-  <div class="panel">
+  <div class="fs-note">
     <h3>What you cannot see</h3>
     <p class="sum">
       Another judge's ballots, any project outside your tracks, the aggregate

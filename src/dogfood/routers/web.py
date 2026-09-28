@@ -18,6 +18,7 @@ the architecture rather than a promise in a README.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
@@ -26,12 +27,14 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import assignment, audit, results, seed
+from ..dev_session import lookup_dev_session, set_session_cookie
 from ..config import GALLERY_PAGE_SIZE
 from ..db import parse_ts, query, query_one
 from ..deps import Conn, Who, default_event_id
 from ..errors import ApiError
 from ..security import Capability, has_capability, judge_record, judge_track_ids
-from .projects import gallery_rows
+from .community import VOTE_CREDIT_BUDGET
+from .projects import gallery_rows, vote_tallies_visible
 
 router = APIRouter(include_in_schema=False)
 
@@ -74,6 +77,22 @@ def _submissions_closed(close: str | None) -> bool:
     if deadline is None:
         return False
     return datetime.now(timezone.utc) >= deadline
+
+
+def _youtube_id(url: str | None) -> str | None:
+    if not url:
+        return None
+    u = url.strip()
+    if "youtu.be/" in u:
+        return u.rsplit("youtu.be/", 1)[-1].split("?")[0].split("&")[0] or None
+    if "youtube.com/watch" in u and "v=" in u:
+        from urllib.parse import parse_qs, urlparse
+
+        q = parse_qs(urlparse(u).query).get("v")
+        return q[0] if q else None
+    if "youtube.com/embed/" in u:
+        return u.rsplit("embed/", 1)[-1].split("?")[0] or None
+    return None
 
 
 def _base(request: Request, conn: Conn, who: Who) -> dict[str, Any]:
@@ -145,6 +164,14 @@ def gallery(
     on it. Both choices are asserted in tests/test_acceptance_invariants.py.
     """
     offset = (page - 1) * GALLERY_PAGE_SIZE
+    vote_event_id = event or default_event_id(conn)
+    vote_row = query_one(conn, "SELECT * FROM events WHERE id = ?", (vote_event_id,))
+    if vote_row is None:
+        raise ApiError("not_found", f"no event '{vote_event_id}'")
+    show_vote_tallies = vote_tallies_visible(conn, who, vote_event_id)
+    list_sort = sort if sort in ("arrival", "newest", "title", "track", "comments", "votes") else "arrival"
+    if list_sort == "votes" and not show_vote_tallies:
+        list_sort = "arrival"
     items, total = gallery_rows(
         conn,
         event_id=event,
@@ -152,9 +179,10 @@ def gallery(
         track=track,
         team=team,
         tag=tag,
-        sort=sort,
+        sort=list_sort,
         limit=GALLERY_PAGE_SIZE,
         offset=offset,
+        reveal_vote_tallies=show_vote_tallies,
     )
     tracks = query(
         conn,
@@ -164,9 +192,9 @@ def gallery(
     )
     track_rows = [dict(t) for t in tracks]
     list_qs = _gallery_query_string(
-        q=q, tag=tag, sort=sort, event=event, team=team, track=track
+        q=q, tag=tag, sort=list_sort, event=event, team=team, track=track
     )
-    filter_qs = _gallery_query_string(q=q, tag=tag, sort=sort, event=event, team=team)
+    filter_qs = _gallery_query_string(q=q, tag=tag, sort=list_sort, event=event, team=team)
     track_nav = [
         {
             "id": "",
@@ -180,7 +208,7 @@ def gallery(
         if not t["n"]:
             continue
         tqs = _gallery_query_string(
-            q=q, tag=tag, sort=sort, event=event, team=team, track=t["id"]
+            q=q, tag=tag, sort=list_sort, event=event, team=team, track=t["id"]
         )
         track_nav.append(
             {
@@ -205,12 +233,15 @@ def gallery(
                 "track": track or "",
                 "tag": tag or "",
                 "team": team or "",
-                "sort": sort if sort in ("arrival", "newest", "title", "track", "comments", "votes") else "arrival",
+                "sort": list_sort,
                 "event": event or "",
             },
             "tracks": track_rows,
             "track_nav": track_nav,
             "query_string": list_qs,
+            "vote_event": dict(vote_row),
+            "credit_budget": VOTE_CREDIT_BUDGET,
+            "show_vote_tallies": show_vote_tallies,
         },
     )
 
@@ -290,12 +321,15 @@ def project_page(request: Request, conn: Conn, who: Who, project_id: str) -> Any
         "ORDER BY c.created_at",
         (project_id,),
     )
+    proj = dict(row)
     return _templates(request).TemplateResponse(
         request,
         "project.html",
         {
             **_base(request, conn, who),
-            "project": dict(row),
+            "project": proj,
+            "tech_tags": json.loads(proj.get("tech_tags") or "[]"),
+            "youtube_id": _youtube_id(proj.get("video_url")),
             "members": [
                 dict(m)
                 for m in query(
@@ -306,9 +340,11 @@ def project_page(request: Request, conn: Conn, who: Who, project_id: str) -> Any
                 )
             ],
             "comments": [dict(c) for c in comments],
+            "comment_count": len(comments),
             "review_count": query_one(
                 conn, "SELECT COUNT(*) AS n FROM scores WHERE project_id = ?", (project_id,)
             )["n"],
+            "credit_budget": VOTE_CREDIT_BUDGET,
             "images": [
                 r["url"]
                 for r in query(
@@ -338,6 +374,19 @@ def login_page(request: Request, conn: Conn, who: Who) -> Any:
         "login.html",
         {**_base(request, conn, who), "seeded_logins": [dict(r) for r in logins]},
     )
+
+
+@router.get("/login/as/{label}")
+def login_as_seeded_session(request: Request, conn: Conn, label: str) -> RedirectResponse:
+    """One-click dev sign-in without JavaScript (same sessions as quick sign-in buttons)."""
+    if not request.app.state.settings.dev_tokens:
+        return RedirectResponse("/login", status_code=303)
+    row = lookup_dev_session(conn, label)
+    if row is None:
+        return RedirectResponse("/login", status_code=303)
+    response = RedirectResponse("/", status_code=303)
+    set_session_cookie(response, str(row["token"]))
+    return response
 
 
 @router.get("/judge", response_class=HTMLResponse)
@@ -516,23 +565,17 @@ def teams_join_link(
     return teams_page(request, conn, who, event=event_id, invite=invite_code)
 
 
-@router.get("/vote", response_class=HTMLResponse)
-def vote_page(request: Request, conn: Conn, who: Who, event: str | None = None) -> Any:
-    event_id = event or default_event_id(conn)
-    row = query_one(conn, "SELECT * FROM events WHERE id = ?", (event_id,))
-    if row is None:
-        raise ApiError("not_found", f"no event '{event_id}'")
-    from ..routers.community import VOTE_CREDIT_BUDGET
+@router.get("/vote")
+def vote_page(event: str | None = None) -> RedirectResponse:
+    """Voting lives on the gallery. Keep /vote as a bookmark into that page.
 
-    return _templates(request).TemplateResponse(
-        request,
-        "vote.html",
-        {
-            **_base(request, conn, who),
-            "event": dict(row),
-            "credit_budget": VOTE_CREDIT_BUDGET,
-        },
-    )
+    The gallery route stays `/projects` (T1). Ballot shuffle stays on
+    GET /api/events/{id}/ballot — this redirect must not become a second
+    listing that reorders fixture titles.
+    """
+    qs = urlencode({"event": event}) if event else ""
+    target = "/projects" + (f"?{qs}" if qs else "") + "#community-vote"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/organizer/setup", response_class=HTMLResponse)

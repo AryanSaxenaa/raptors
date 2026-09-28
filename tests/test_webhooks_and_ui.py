@@ -76,9 +76,31 @@ def test_audit_enqueue_does_not_block_on_bad_webhook(client, settings):
         conn.close()
 
 
+def test_dev_login_attaches_seeded_session(client):
+    denied = client.post("/api/auth/dev-login", json={"label": "organizer"})
+    assert denied.status_code == 200
+    assert denied.cookies.get("df_session")
+    who = client.get("/api/auth/whoami")
+    assert who.status_code == 200
+    assert who.json()["role"] == "organizer"
+
+    quick = client.get("/login/as/judge_a", follow_redirects=False)
+    assert quick.status_code == 303
+    assert quick.cookies.get("df_session")
+    who2 = client.get("/api/auth/whoami", cookies=quick.cookies)
+    assert who2.json()["role"] == "judge"
+
+
 def test_new_ui_routes(client):
     assert client.get("/teams").status_code == 200
-    assert client.get("/vote").status_code == 200
+    vote = client.get("/vote", follow_redirects=False)
+    assert vote.status_code == 303
+    location = vote.headers.get("location", "")
+    assert location.startswith("/projects")
+    assert "#community-vote" in location
+    landed = client.get("/vote")
+    assert landed.status_code == 200
+    assert "Sign in to vote" in landed.text
     assert client.get("/embed/gallery").status_code == 200
     embed = client.get("/embed/gallery")
     assert "frame-ancestors" in embed.headers.get("content-security-policy", "")
@@ -90,11 +112,37 @@ def test_new_ui_routes(client):
 def test_vote_template_avoids_unsafe_innerhtml():
     from pathlib import Path
 
-    vote_html = (
-        Path(__file__).resolve().parents[1] / "src" / "dogfood" / "templates" / "vote.html"
+    gallery_html = (
+        Path(__file__).resolve().parents[1] / "src" / "dogfood" / "templates" / "gallery.html"
     ).read_text(encoding="utf-8")
-    assert "innerHTML" not in vote_html
-    assert "textContent" in vote_html
+    assert "innerHTML" not in gallery_html
+    assert "textContent" in gallery_html
+
+
+def test_gallery_hosts_quadratic_vote_without_shuffling_listing(client):
+    public = client.get("/projects")
+    assert public.status_code == 200
+    body = public.text
+    assert 'id="community-vote"' in body
+    assert "Sign in to vote" in body
+    assert "Cast vote" not in body
+    assert "Most votes" not in body
+
+    authed = client.get("/projects", headers=auth(PARTICIPANT_TOKEN)).text
+    assert "Cast vote" in authed
+
+    titles = client.get("/api/projects").json()["projects"]
+    assert titles, "gallery JSON should list fixture projects"
+    html_order = [p["title"] for p in titles]
+    for title in html_order[:5]:
+        assert title in body
+
+    shuffled = client.get("/projects?sort=votes")
+    assert shuffled.status_code == 200
+    assert [p["title"] for p in client.get("/api/projects?sort=votes").json()["projects"][:5]] == html_order[:5]
+
+    organizer = client.get("/projects", headers=auth(ORG_TOKEN)).text
+    assert "Most votes" in organizer
 
 
 def test_openapi_lists_webhooks(client):

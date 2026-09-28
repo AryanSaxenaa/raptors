@@ -2,11 +2,13 @@
 {% block title %}Webhooks &middot; Raptors{% endblock %}
 
 {% block body %}
-<h1>Webhooks</h1>
-<p class="lede">
-  Signed JSON POSTs on audit events. Verify with
-  <code>X-Dogfood-Signature: sha256=HMAC(body)</code> using the secret shown once at registration.
-</p>
+<header class="workspace-head">
+  <h1>Webhooks</h1>
+  <p class="lede">
+    Signed JSON POSTs on audit events. Verify with
+    <code>X-Dogfood-Signature: sha256=HMAC(body)</code> using the secret shown once at registration.
+  </p>
+</header>
 
 <div id="flash" class="notice" hidden></div>
 

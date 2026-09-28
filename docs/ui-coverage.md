@@ -6,11 +6,10 @@ Most writes use the JSON API from HTML pages (`ARCHITECTURE.md`). The table belo
 
 | Flow | UI | API |
 | --- | --- | --- |
-| Gallery | `/projects` | `GET /api/projects` |
+| Gallery + community vote | `/projects` (`/vote` redirects here) | `GET /api/projects`; `GET/POST /api/events/{id}/ballot`, `/votes` |
 | Project + comments | `/projects/{id}` | `POST /api/projects/{id}/comments` |
 | Submit | `/projects/new` | `POST /api/events/{id}/projects` |
 | Teams | `/teams`, `/teams/join/{code}` | `POST /api/events/{id}/teams`, `POST /api/teams/join` |
-| Community vote | `/vote` | `GET/POST /api/events/{id}/ballot`, `/votes` |
 | Sign in | `/login` | `POST /api/auth/login` |
 | Certificate | `/certificates/{id}` | `GET /api/projects/{id}/certificate` (after publish) |
 | Public record | — | `GET /api/records/{hash}`, `POST /api/records/verify` |

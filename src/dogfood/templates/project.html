@@ -1,89 +1,191 @@
 {% extends "base.html" %}
 {% block title %}{{ project.title }} &middot; Raptors{% endblock %}
+{% block body_class %}page-project{% endblock %}
 
 {% block body %}
-<h1>{{ project.title }}</h1>
-<p class="lede">{{ project.tagline }}</p>
-
-{% if project.duplicate_of %}
-  <div class="notice warn">
-    Flagged as a possible duplicate of
-    <a href="/projects/{{ project.duplicate_of }}">{{ project.duplicate_of }}</a>
-    &mdash; {{ project.duplicate_reason }}. It is still listed and still stored; it is
-    excluded from the ranking while the organizer leaves that switch on.
-  </div>
-{% endif %}
-
-<div class="grid c2">
-  <div class="panel">
-    <h3>Submission</h3>
-    <table>
-      <tbody>
-        <tr><th>Project id</th><td class="mono">{{ project.id }}</td></tr>
-        <tr><th>Team</th><td>{{ project.team_name }} <span class="dim mono">{{ project.team_id }}</span></td></tr>
-        <tr><th>Track</th><td>{{ project.track_name or '-' }}</td></tr>
-        <tr><th>Event</th><td>{{ project.event_name }}</td></tr>
-        <tr><th>Submitted</th><td class="mono">{{ project.submitted_at or '-' }}</td></tr>
-        <tr><th>Status</th><td><span class="badge">{{ project.status }}</span></td></tr>
-        <tr><th>Repository</th><td>
-          {% if project.repo_url %}<a href="{{ project.repo_url }}" rel="nofollow noopener">{{ project.repo_url }}</a>
-          {% else %}<span class="dim">-</span>{% endif %}
-        </td></tr>
-        <tr><th>Live demo</th><td>
-          {% if project.live_url %}<a href="{{ project.live_url }}" rel="nofollow noopener">{{ project.live_url }}</a>
-          {% else %}<span class="dim">-</span>{% endif %}
-        </td></tr>
-        <tr><th>Demo video</th><td>
-          {% if project.video_url %}<a href="{{ project.video_url }}" rel="nofollow noopener">{{ project.video_url }}</a>
-          {% else %}<span class="dim">-</span>{% endif %}
-        </td></tr>
-        <tr><th>Members</th><td>{{ members | map(attribute='name') | join(', ') }}</td></tr>
-        <tr><th>Reviews</th><td>
-          {{ review_count }}
-          {% if review_count < 3 %}<span class="badge warn">under-reviewed</span>{% endif %}
-        </td></tr>
-      </tbody>
-    </table>
-    {% if project.description %}
-      <h3 style="margin-top:20px">Description</h3>
-      <p class="sum">{{ project.description }}</p>
+<div class="project-hero">
+  <div class="project-hero__inner">
+    <p class="section-label project-hero__event">{{ project.event_name }}</p>
+    <h1 class="project-hero__title">{{ project.title }}</h1>
+    {% if project.tagline %}
+      <p class="project-hero__tagline">{{ project.tagline }}</p>
     {% endif %}
-    {% if images %}
-      <h3 style="margin-top:20px">Image gallery</h3>
-      <div class="grid c2">
-        {% for url in images %}
-          <p><a href="{{ url }}" rel="nofollow noopener">{{ url }}</a></p>
-        {% endfor %}
-      </div>
-    {% endif %}
-    <p class="sum" style="margin-top:16px">
-      <a href="/certificates/{{ project.id }}">Certificate</a>
-      <span class="dim">(issued after the organizer publishes results)</span>
-    </p>
-  </div>
-
-  <div class="panel">
-    <h3>Comments</h3>
-    {% if not comments %}<p class="sum">No comments yet.</p>{% endif %}
-    {% for c in comments %}
-      <div style="border-top:1px solid var(--line); padding:10px 0">
-        <div class="meta">{{ c.author }} &middot; {{ c.created_at }}</div>
-        <div class="sum">{{ c.body }}</div>
-      </div>
-    {% endfor %}
-
-    {% if not who.is_anonymous %}
-      <div id="flash" class="notice" hidden></div>
-      <label for="comment">Add a comment</label>
-      <textarea id="comment" placeholder="Rate-limited to 20 per five minutes."></textarea>
-      <div style="margin-top:10px"><button id="post-comment">Post comment</button></div>
-    {% else %}
-      <p class="sum" style="margin-top:14px"><a href="/login">Sign in</a> to comment.</p>
-    {% endif %}
+    <div class="project-hero__actions">
+      <a class="project-pill project-pill--muted" href="#comments">
+        {{ comment_count }} comment{% if comment_count != 1 %}s{% endif %}
+      </a>
+      {% if not who.is_anonymous %}
+        <button type="button" class="project-pill project-pill--accent" id="hero-vote-btn">
+          Support with credits
+        </button>
+      {% else %}
+        <a class="project-pill project-pill--accent" href="/login">Sign in to vote</a>
+      {% endif %}
+      {% if project.live_url %}
+        <a class="project-pill project-pill--ghost" href="{{ project.live_url }}" rel="nofollow noopener">Try demo</a>
+      {% endif %}
+      {% if project.repo_url %}
+        <a class="project-pill project-pill--ghost" href="{{ project.repo_url }}" rel="nofollow noopener">Repository</a>
+      {% endif %}
+    </div>
   </div>
 </div>
 
-<p style="margin-top:18px"><a class="btn ghost" href="/projects">Back to the gallery</a></p>
+{% if project.duplicate_of %}
+  <div class="wrap">
+    <div class="notice warn project-flag">
+      Flagged as a possible duplicate of
+      <a href="/projects/{{ project.duplicate_of }}">{{ project.duplicate_of }}</a>
+      &mdash; {{ project.duplicate_reason }}.
+    </div>
+  </div>
+{% endif %}
+
+<div class="wrap project-layout">
+  <article class="project-story">
+    {% if youtube_id %}
+      <div class="project-media">
+        <iframe
+          title="Demo video for {{ project.title }}"
+          src="https://www.youtube.com/embed/{{ youtube_id }}"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+          loading="lazy"></iframe>
+      </div>
+    {% elif project.thumbnail_url %}
+      <div class="project-media project-media--still">
+        <img src="{{ project.thumbnail_url }}" alt="" loading="lazy" decoding="async">
+      </div>
+    {% endif %}
+
+    {% if project.description %}
+      <section class="project-section">
+        <h2 class="project-section__title">What we built</h2>
+        <div class="project-prose">{{ project.description }}</div>
+      </section>
+    {% endif %}
+
+    {% if tech_tags %}
+      <section class="project-section">
+        <h2 class="project-section__title">Built with</h2>
+        <div class="project-tags tags">
+          {% for tag in tech_tags %}<span class="badge">{{ tag }}</span>{% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    {% if project.repo_url or project.live_url or project.video_url %}
+      <section class="project-section">
+        <h2 class="project-section__title">Try it out</h2>
+        <ul class="project-links">
+          {% if project.live_url %}
+            <li><a href="{{ project.live_url }}" rel="nofollow noopener">{{ project.live_url }}</a></li>
+          {% endif %}
+          {% if project.repo_url %}
+            <li><a href="{{ project.repo_url }}" rel="nofollow noopener">{{ project.repo_url }}</a></li>
+          {% endif %}
+          {% if project.video_url %}
+            <li><a href="{{ project.video_url }}" rel="nofollow noopener">{{ project.video_url }}</a></li>
+          {% endif %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if images %}
+      <section class="project-section">
+        <h2 class="project-section__title">Gallery</h2>
+        <div class="project-gallery">
+          {% for url in images %}
+            <a class="project-gallery__item" href="{{ url }}" rel="nofollow noopener">
+              <img src="{{ url }}" alt="" loading="lazy" decoding="async">
+            </a>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    <section class="project-section" id="comments">
+      <h2 class="project-section__title">Comments</h2>
+      {% if not comments %}
+        <p class="sum">No comments yet. Be the first to leave feedback.</p>
+      {% endif %}
+      <div class="project-comments">
+        {% for c in comments %}
+          <article class="project-comment">
+            <header class="project-comment__head">
+              <strong>{{ c.author }}</strong>
+              <time class="dim mono">{{ c.created_at }}</time>
+            </header>
+            <p class="project-comment__body">{{ c.body }}</p>
+          </article>
+        {% endfor %}
+      </div>
+
+      {% if not who.is_anonymous %}
+        <div id="flash" class="notice" hidden></div>
+        <label class="project-comment__label" for="comment">Add a comment</label>
+        <textarea id="comment" class="project-comment__input" rows="4"
+                  placeholder="Share feedback for the team (rate-limited)."></textarea>
+        <button type="button" class="project-comment__submit" id="post-comment">Post comment</button>
+      {% else %}
+        <p class="sum project-comment__signin"><a href="/login">Sign in</a> to comment.</p>
+      {% endif %}
+    </section>
+
+    {% if not who.is_anonymous %}
+      <section class="project-section project-vote-panel" id="project-vote" hidden>
+        <h2 class="project-section__title">Community vote</h2>
+        <p class="sum">Spend up to <b>{{ credit_budget }}</b> quadratic credits on this project.</p>
+        <div class="project-vote-row">
+          <label class="ballot-item__credits">
+            Credits
+            <input type="number" class="ballot-credits" id="project-credits" min="1"
+                   max="{{ credit_budget }}" value="1"
+                   aria-label="Credits for {{ project.title }}">
+          </label>
+          <button type="button" id="project-vote">Cast vote</button>
+        </div>
+        <p class="dim sum" id="project-vote-status"></p>
+      </section>
+    {% endif %}
+
+    <p class="project-back">
+      <a class="btn ghost" href="/projects">&larr; Back to gallery</a>
+    </p>
+  </article>
+
+  <aside class="project-aside panel">
+    <div class="project-meta-block">
+      <h2 class="project-meta-block__label">Submitted to</h2>
+      <p class="project-meta-block__value">{{ project.event_name }}</p>
+      {% if project.track_name %}
+        <p class="project-meta-block__sub">{{ project.track_name }}</p>
+      {% endif %}
+    </div>
+    <div class="project-meta-block">
+      <h2 class="project-meta-block__label">Created by</h2>
+      <ul class="project-team">
+        {% for m in members %}
+          <li>{{ m.name }}</li>
+        {% endfor %}
+      </ul>
+      <p class="dim mono project-meta-block__sub">{{ project.team_name }}</p>
+    </div>
+    <div class="project-meta-block">
+      <h2 class="project-meta-block__label">Details</h2>
+      <dl class="project-dl">
+        <div><dt>Submitted</dt><dd class="mono">{{ project.submitted_at or '—' }}</dd></div>
+        <div><dt>Status</dt><dd><span class="badge">{{ project.status }}</span></dd></div>
+        <div><dt>Judge reviews</dt><dd>{{ review_count }}{% if review_count < 3 %} <span class="badge warn">under-reviewed</span>{% endif %}</dd></div>
+        <div><dt>Project id</dt><dd class="mono">{{ project.id }}</dd></div>
+      </dl>
+    </div>
+    <p class="sum project-cert">
+      <a href="/certificates/{{ project.id }}">Certificate</a>
+      <span class="dim">after publish</span>
+    </p>
+  </aside>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -101,5 +203,38 @@ if (btn) btn.addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+{% if not who.is_anonymous %}
+const eventId = {{ project.event_id | tojson }};
+const projectId = {{ project.id | tojson }};
+const votePanel = document.getElementById('project-vote');
+const heroVote = document.getElementById('hero-vote-btn');
+if (heroVote && votePanel) {
+  heroVote.addEventListener('click', () => {
+    votePanel.hidden = false;
+    votePanel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  });
+}
+const voteBtn = document.getElementById('project-vote');
+if (voteBtn) voteBtn.addEventListener('click', async () => {
+  const input = document.getElementById('project-credits');
+  const credits = parseInt(input && input.value, 10) || 1;
+  const status = document.getElementById('project-vote-status');
+  voteBtn.disabled = true;
+  try {
+    await api('POST', '/api/events/' + eventId + '/votes', {
+      project_id: projectId,
+      credits: credits,
+    });
+    if (status) status.textContent = 'Vote recorded. You can adjust credits until the window closes.';
+    flash('Vote recorded.', 'ok');
+  } catch (e) {
+    if (status) status.textContent = '';
+    flash(e.message, 'bad');
+  } finally {
+    voteBtn.disabled = false;
+  }
+});
+{% endif %}
 </script>
 {% endblock %}

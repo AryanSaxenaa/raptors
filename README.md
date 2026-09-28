@@ -38,7 +38,7 @@ OpenAPI: [docs/openapi.json](docs/openapi.json) (also live at `/openapi.json` wh
 | Page | URL |
 | --- | --- |
 | Teams | `/teams` |
-| Community vote | `/vote` |
+| Community vote | `/projects#community-vote` (`/vote` redirects) |
 | Organizer setup | `/organizer/setup` |
 | Webhooks | `/organizer/webhooks` |
 | Embeddable gallery | `/embed/gallery` + `/static/embed.js` |
@@ -110,7 +110,7 @@ CI runs the same pytest command on push (`.github/workflows/ci.yml`). For a clea
 
 ## Beyond the verified tiers
 
-Shipped in code but not in `run.py`: community **comments** and **quadratic voting** (UI at `/vote`), **webhooks** (API + `/organizer/webhooks`), **embeddable gallery** (`/embed/gallery`, `embed.js`), bulk import/export, hash-chained audit log, **public records** (`/api/records/{hash}`), **project certificates** after publish.
+Shipped in code but not in `run.py`: community **comments** and **quadratic voting** (UI on `/projects`; `/vote` redirects there), **webhooks** (API + `/organizer/webhooks`), **embeddable gallery** (`/embed/gallery`, `embed.js`), bulk import/export, hash-chained audit log, **public records** (`/api/records/{hash}`), **project certificates** after publish.
 
 ## Layout
 

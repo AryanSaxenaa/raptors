@@ -73,7 +73,7 @@ ROLE_MATRIX: dict[str, frozenset[Capability]] = {
 }
 
 ROLE_OPERATIONS: dict[str, frozenset[Operation]] = {
-    "visitor": frozenset({Operation.VOTE}),
+    "visitor": frozenset(),
     "participant": frozenset(
         {Operation.MANAGE_TEAM, Operation.SUBMIT_PROJECT, Operation.COMMENT, Operation.VOTE}
     ),

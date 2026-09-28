@@ -32,7 +32,7 @@ from ..config import GALLERY_PAGE_SIZE
 from ..db import parse_ts, query, query_one, transaction, utcnow
 from ..deps import Conn, Who, default_event_id, get_event
 from ..errors import ApiError
-from ..security import Operation, deny, require_operation
+from ..security import Capability, Identity, Operation, deny, has_capability, require_operation
 
 router = APIRouter(tags=["projects"])
 
@@ -378,6 +378,25 @@ _GALLERY_SORT: dict[str, str] = {
 }
 
 
+def vote_tallies_visible(
+    conn: sqlite3.Connection, who: Identity, event_id: str | None
+) -> bool:
+    """Whether community vote totals may appear on the public gallery.
+
+    T3 keeps results embargoed until the organizer publishes. Showing a vote
+    count — or sorting the gallery by it — is a ranking leak, so both stay
+    off for anyone who cannot already hit GET /vote-results.
+    """
+    if has_capability(who.role, Capability.AGGREGATE):
+        return True
+    if not event_id:
+        return False
+    row = query_one(
+        conn, "SELECT results_published FROM events WHERE id = ?", (event_id,)
+    )
+    return bool(row and row["results_published"])
+
+
 def gallery_rows(
     conn: sqlite3.Connection,
     *,
@@ -389,13 +408,21 @@ def gallery_rows(
     sort: str = "arrival",
     limit: int = GALLERY_PAGE_SIZE,
     offset: int = 0,
+    reveal_vote_tallies: bool = False,
 ) -> tuple[list[dict[str, Any]], int]:
     """The public gallery query, shared by the HTML page and the JSON API.
 
     Default order is arrival order. A gallery should not imply a ranking before
     judging has happened, and it also keeps the earliest fixture projects on
     page one, which is where the acceptance suite looks for them.
+
+    Vote totals are omitted unless `reveal_vote_tallies` is set. That flag is
+    for organizers (or a published event), not for the public listing: the
+    ballot API is shuffled per voter, but this query must stay in arrival
+    order on the default path.
     """
+    if sort == "votes" and not reveal_vote_tallies:
+        sort = "arrival"
     clauses = ["p.status IN ('submitted', 'flagged_duplicate')"]
     params: list[Any] = []
     if event_id:
@@ -457,7 +484,7 @@ def gallery_rows(
             "duplicate_of": r["duplicate_of"],
             "event_id": r["event_id"],
             "comment_count": int(r["comment_count"] or 0),
-            "vote_count": int(r["vote_count"] or 0),
+            "vote_count": int(r["vote_count"] or 0) if reveal_vote_tallies else 0,
         }
         for r in rows
     ]
@@ -467,6 +494,7 @@ def gallery_rows(
 @router.get("/api/projects", summary="The public gallery, as JSON")
 def list_projects(
     conn: Conn,
+    who: Who,
     q: str | None = Query(default=None, description="free text over title, summary, description"),
     track: str | None = None,
     team: str | None = None,
@@ -476,6 +504,7 @@ def list_projects(
     limit: int = Query(default=GALLERY_PAGE_SIZE, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
+    reveal = vote_tallies_visible(conn, who, event_id)
     items, total = gallery_rows(
         conn,
         event_id=event_id,
@@ -486,6 +515,7 @@ def list_projects(
         sort=sort,
         limit=limit,
         offset=offset,
+        reveal_vote_tallies=reveal,
     )
     return {"total": total, "count": len(items), "offset": offset, "projects": items}
 

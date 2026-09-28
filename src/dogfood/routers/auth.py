@@ -10,13 +10,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from .. import audit
 from ..db import query_one, transaction
 from ..deps import Conn, Who
 from ..errors import ApiError
+from ..dev_session import DEV_LOGIN_LABELS, lookup_dev_session, set_session_cookie
 from ..security import (
     ROLE_MATRIX,
     ROLE_OPERATIONS,
@@ -69,6 +70,39 @@ def login(conn: Conn, body: LoginIn, response: Response) -> dict[str, Any]:
             "email": user["email"],
             "name": user["name"],
             "role": user["role"],
+        },
+    }
+
+
+class DevLoginIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    label: str = Field(min_length=1, max_length=32)
+
+
+@router.post("/dev-login", summary="Attach a seeded development session (local only)")
+def dev_login(request: Request, conn: Conn, body: DevLoginIn, response: Response) -> dict[str, Any]:
+    """Set the session cookie from a seeded label. Same tokens as .dogfood.toml.
+
+    Only available when DOGFOOD_DEV_TOKENS is enabled. Uses Set-Cookie like
+    password login so the browser session matches what curl sends in headers.
+    """
+    if not request.app.state.settings.dev_tokens:
+        raise ApiError("not_found", "dev login is disabled")
+
+    row = lookup_dev_session(conn, body.label)
+    if row is None:
+        if body.label.strip() not in DEV_LOGIN_LABELS:
+            raise ApiError("invalid_request", f"unknown dev label '{body.label}'")
+        raise ApiError("not_found", f"no seeded session for '{body.label}'")
+
+    set_session_cookie(response, str(row["token"]))
+    return {
+        "user": {
+            "id": row["id"],
+            "email": row["email"],
+            "name": row["name"],
+            "role": row["role"],
         },
     }
 

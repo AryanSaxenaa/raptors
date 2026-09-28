@@ -10,8 +10,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Raptors{% endblock %}</title>
   <link rel="stylesheet" href="{{ static_url('app.css') }}">
+  {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
+{% block atmosphere %}{% endblock %}
 <header class="top">
   <div class="wrap top-shell">
     <a class="brand" href="/" aria-label="Raptors home">
@@ -23,7 +25,7 @@
         <a href="/projects">Gallery</a>
         <a href="/projects/new">Submit</a>
         <a href="/teams">Teams</a>
-        <a href="/vote">Vote</a>
+        <a href="/projects#community-vote">Vote</a>
         {% if is_judge %}<a href="/judge">Judge</a>{% endif %}
         {% if can_aggregate %}<a href="/organizer">Organizer</a>
         <a href="/organizer/setup">Setup</a>
@@ -35,7 +37,7 @@
         {% if who.is_anonymous %}
           <a class="btn btn--nav" href="/login">Sign in</a>
         {% else %}
-          <span class="who__meta">{{ who.name }} &middot; <b>{{ who.role }}</b></span>
+          <span class="who__meta who__meta--center">{{ who.name }} &middot; <b>{{ who.role }}</b></span>
           <a class="btn btn--nav btn--nav-ghost" href="/login">Switch</a>
         {% endif %}
       </div>
@@ -79,6 +81,8 @@ function flash(message, kind) {
   el.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 }
 </script>
+<script src="{{ static_url('ditherwave.umd.js') }}" defer></script>
+<script src="{{ static_url('atmosphere.js') }}" defer></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
