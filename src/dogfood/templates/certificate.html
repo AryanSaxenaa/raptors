@@ -2,14 +2,22 @@
 {% block title %}Certificate &middot; {{ cert.title }}{% endblock %}
 
 {% block body %}
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="workspace-head">
+    <p class="fs-eyebrow">Participation certificate</p>
+    <h1>{{ cert.title }}</h1>
+    <p class="lede">
+      {{ cert.team or 'Independent' }}
+      {% if cert.track %} &middot; {{ cert.track }}{% endif %}
+      &middot; {{ cert.event.name }}
+    </p>
+  </header>
+</div>
+
 <div class="panel" style="max-width:720px;margin:0 auto;padding:36px">
-  <p class="dim" style="text-transform:uppercase;letter-spacing:.12em;font-size:12px">Participation certificate</p>
-  <h1>{{ cert.title }}</h1>
-  <p class="lede">
-    {{ cert.team or 'Independent' }}
-    {% if cert.track %} &middot; {{ cert.track }}{% endif %}
-    &middot; {{ cert.event.name }}
-  </p>
   <table>
     <tbody>
       <tr><th>Rank</th><td class="num">{{ cert.position }}</td></tr>
@@ -20,10 +28,9 @@
     </tbody>
   </table>
   <p class="sum" style="margin-top:18px">
-    Verify at <code>GET /api/records/{{ cert.record_hash }}</code>
-    or <code>POST /api/records/verify</code> with this JSON.
-    The hash is SHA-256 over the audit chain head and the canonical payload.
-    It is not an X.509 certificate.
+    Anyone can verify this record at
+    <a href="/api/records/{{ cert.record_hash }}"><code>/api/records/{{ cert.record_hash[:12] }}…</code></a>.
+    The hash covers the audit chain at the time it was issued.
   </p>
   <p><a href="/projects/{{ cert.project_id }}">Back to project</a></p>
 </div>

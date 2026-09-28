@@ -2,13 +2,17 @@
 {% block title %}Organizer &middot; Raptors{% endblock %}
 
 {% block body %}
-<header class="workspace-head">
-  <h1>Organizer console</h1>
-  <p class="lede">
-    {{ event.name }} &middot; <span class="mono">{{ event.id }}</span> &middot;
-    target {{ progress.reviews_per_project }} reviews per project.
-  </p>
-</header>
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="workspace-head">
+    <h1>Organizer console</h1>
+    <p class="lede">
+      <b>{{ event.name }}</b> &middot; {{ progress.reviews_per_project }} reviews per project.
+    </p>
+  </header>
+</div>
 
 <div id="flash" class="notice" hidden></div>
 
@@ -52,10 +56,7 @@
       </tbody>
     </table>
     <p class="sum" style="margin-top:10px">
-      An uneven histogram is a fairness problem: a project seen twice is ranked
-      against projects seen five times. The normalizer reports a standard error
-      per project so this stays visible in the results rather than being averaged
-      away.
+      Projects with fewer reviews than the target are harder to rank fairly. Top up assignments below when a track is short.
     </p>
   </div>
 
@@ -99,7 +100,7 @@
     </table>
     <div style="margin-top:14px">
       <button id="assign">Top up assignments</button>
-      <span class="dim">Least-loaded judge first, track-scoped, skipping anyone on the team.</span>
+      <span class="dim">Least-loaded judge first, same track, skipping anyone on the team.</span>
     </div>
   </div>
 {% endif %}
@@ -149,9 +150,7 @@
       </tbody>
     </table>
     <p class="sum" style="margin-top:10px">
-      Excluding removes the duplicate from the ranking only. Its ballots stay in
-      the judge-calibration fit, because a judge's tendency measured on a
-      duplicate is still a real measurement of that judge.
+      Confirming a duplicate drops it from the ranking. Those ballots still count when we calibrate judges.
     </p>
   </div>
 {% endif %}
@@ -168,10 +167,7 @@
     </tbody>
   </table>
   <p class="sum" style="margin-top:10px">
-    Weights are per-event rows, not constants. Editing them via
-    <code>PUT /api/events/{{ event.id }}/rubric</code> bumps
-    <code>rubric_version</code>, which invalidates the results cache, so a
-    mid-event rubric change cannot leave a stale leaderboard behind.
+    Weights are for this event. Saving a change refreshes the published results.
   </p>
 </div>
 
@@ -182,18 +178,13 @@
     <a href="/organizer/webhooks">Webhooks</a>
   </p>
   <p class="sum">
-    RFC 4180 CSV, CRLF line endings, no byte-order mark, one file per stage.
+    Download each stage as CSV, or the whole event as JSON.
   </p>
   <p>
     {% for stage in ['projects','teams','judges','assignments','scores','results','audit'] %}
       <a class="badge" href="/api/exports/{{ stage }}.csv">{{ stage }}.csv</a>
     {% endfor %}
     <a class="badge" href="/api/exports/event.json">event.json</a>
-  </p>
-  <p class="sum">
-    <code>event.json</code> round-trips through
-    <code>POST /api/imports/event.json</code>, so a whole event can be moved
-    between installations.
   </p>
 </div>
 {% endblock %}

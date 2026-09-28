@@ -31,14 +31,13 @@
         <a href="/organizer/setup">Setup</a>
         <a href="/organizer/results">Results</a>{% endif %}
         {% if can_audit %}<a href="/organizer/audit">Audit</a>{% endif %}
-        <a href="/docs">API</a>
       </nav>
       <div class="who">
         {% if who.is_anonymous %}
           <a class="btn btn--nav" href="/login">Sign in</a>
         {% else %}
           <span class="who__meta who__meta--center">{{ who.name }} &middot; <b>{{ who.role }}</b></span>
-          <a class="btn btn--nav btn--nav-ghost" href="/login">Switch</a>
+          <a class="btn btn--nav btn--nav-ghost" href="/login">Account</a>
         {% endif %}
       </div>
     </div>

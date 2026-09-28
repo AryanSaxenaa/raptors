@@ -6,14 +6,18 @@
 {% endblock %}
 
 {% block body %}
-<header class="fs-page-head workspace-head">
-  <p class="fs-eyebrow">SITE 04 · TEAMS</p>
-  <h1>Teams</h1>
-  <p class="lede">
-    Create a team or join with an invite code before submitting a project.
-    Writes go through the same JSON API as external clients.
-  </p>
-</header>
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="fs-page-head workspace-head fs-page-head--wave">
+    <p class="fs-eyebrow">TEAMS</p>
+    <h1>Teams</h1>
+    <p class="lede">
+      Create a team or join with an invite code before you submit.
+    </p>
+  </header>
+</div>
 
 <form class="fs-event-row" method="get" action="/teams">
   <label for="event">Event</label>
@@ -27,7 +31,7 @@
 <div id="flash" class="notice" hidden></div>
 
 {% if who.is_anonymous %}
-  <div class="fs-banner"><a href="/login">Sign in</a> as a participant to create or join a team.</div>
+  <div class="fs-banner"><a href="/login">Sign in</a> to create or join a team.</div>
 {% else %}
   <div class="fs-split">
     <div class="fs-split__col">
@@ -35,7 +39,7 @@
       <label for="team-name">Display name</label>
       <input id="team-name" placeholder="Team name">
       <div style="margin-top:14px"><button id="create-team" type="button">Create team</button></div>
-      <p class="sum">Duplicate names are allowed; identity is the team id.</p>
+      <p class="sum">Share the invite code with teammates after you create the team.</p>
     </div>
     <div class="fs-split__or" aria-hidden="true">or</div>
     <div class="fs-split__col">
@@ -49,12 +53,11 @@
   <h2 class="fs-teams-head">Your teams on this event</h2>
   {% if my_teams %}
     <table class="fs-teams-table data">
-      <thead><tr><th>Name</th><th>Team id</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th></th></tr></thead>
       <tbody>
         {% for t in my_teams %}
           <tr>
             <td>{{ t.name }}</td>
-            <td class="mono">{{ t.id }}</td>
             <td><a href="/projects/new?event={{ event.id }}">Submit a project</a></td>
           </tr>
         {% endfor %}

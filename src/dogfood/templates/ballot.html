@@ -2,17 +2,25 @@
 {% block title %}Score {{ project.title }} &middot; Raptors{% endblock %}
 
 {% block body %}
-<header class="workspace-head">
-  <h1>{{ project.title }}</h1>
-  <p class="lede">{{ project.tagline }}</p>
-</header>
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="workspace-head">
+    <h1>{{ project.title }}</h1>
+    {% if project.tagline %}
+      <p class="lede">{{ project.tagline }}</p>
+    {% else %}
+      <p class="lede dim">Score this submission against the rubric below.</p>
+    {% endif %}
+  </header>
+</div>
 
 <div class="grid c2">
   <div class="panel">
     <h3>The submission</h3>
     <table><tbody>
-      <tr><th>Project</th><td class="mono">{{ project.id }}</td></tr>
-      <tr><th>Track</th><td class="mono">{{ project.track_id or '-' }}</td></tr>
+      <tr><th>Track</th><td>{{ project.track_id or '-' }}</td></tr>
       <tr><th>Repository</th><td>
         {% if project.repo_url %}<a href="{{ project.repo_url }}" rel="nofollow noopener">{{ project.repo_url }}</a>
         {% else %}<span class="dim">-</span>{% endif %}</td></tr>
@@ -32,8 +40,7 @@
 
     {% if your_ballot %}
       <div class="notice">
-        You scored this on {{ your_ballot.submitted_at }}. Saving again revises it,
-        and the audit log keeps both the before and the after.
+        You scored this on {{ your_ballot.submitted_at }}. Saving again updates your ballot.
       </div>
     {% endif %}
 
@@ -42,8 +49,6 @@
         <div class="criterion">
           <div class="head">
             <strong>{{ c.label }}</strong>
-            {# Weights are data, not constants: the organizer sets them per
-               event, which is the thing the market leader cannot do. #}
             <span class="badge">weight {{ c.weight }}</span>
           </div>
           {% if c.description %}<div class="dim" style="font-size:13px">{{ c.description }}</div>{% endif %}
@@ -91,8 +96,7 @@ document.getElementById('save').addEventListener('click', async () => {
     });
     location.href = '/judge';
   } catch (e) {
-    const code = e.problem && e.problem.code ? ' [' + e.problem.code + ']' : '';
-    flash(e.message + code, 'bad');
+    flash(e.message, 'bad');
   }
 });
 </script>

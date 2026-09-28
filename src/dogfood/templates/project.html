@@ -4,6 +4,9 @@
 
 {% block body %}
 <div class="project-hero">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
   <div class="project-hero__inner">
     <p class="section-label project-hero__event">{{ project.event_name }}</p>
     <h1 class="project-hero__title">{{ project.title }}</h1>
@@ -125,7 +128,7 @@
         <div id="flash" class="notice" hidden></div>
         <label class="project-comment__label" for="comment">Add a comment</label>
         <textarea id="comment" class="project-comment__input" rows="4"
-                  placeholder="Share feedback for the team (rate-limited)."></textarea>
+                  placeholder="Share feedback for the team."></textarea>
         <button type="button" class="project-comment__submit" id="post-comment">Post comment</button>
       {% else %}
         <p class="sum project-comment__signin"><a href="/login">Sign in</a> to comment.</p>
@@ -135,7 +138,7 @@
     {% if not who.is_anonymous %}
       <section class="project-section project-vote-panel" id="project-vote" hidden>
         <h2 class="project-section__title">Community vote</h2>
-        <p class="sum">Spend up to <b>{{ credit_budget }}</b> quadratic credits on this project.</p>
+        <p class="sum">You can spend up to <b>{{ credit_budget }}</b> credits here. Influence is the square root of credits on this project.</p>
         <div class="project-vote-row">
           <label class="ballot-item__credits">
             Credits
@@ -176,13 +179,12 @@
       <dl class="project-dl">
         <div><dt>Submitted</dt><dd class="mono">{{ project.submitted_at or '—' }}</dd></div>
         <div><dt>Status</dt><dd><span class="badge">{{ project.status }}</span></dd></div>
-        <div><dt>Judge reviews</dt><dd>{{ review_count }}{% if review_count < 3 %} <span class="badge warn">under-reviewed</span>{% endif %}</dd></div>
-        <div><dt>Project id</dt><dd class="mono">{{ project.id }}</dd></div>
+        <div><dt>Judge reviews</dt><dd>{{ review_count }}{% if review_count < 3 %} <span class="badge warn">needs more reviews</span>{% endif %}</dd></div>
       </dl>
     </div>
     <p class="sum project-cert">
       <a href="/certificates/{{ project.id }}">Certificate</a>
-      <span class="dim">after publish</span>
+      <span class="dim">available after results are published</span>
     </p>
   </aside>
 </div>

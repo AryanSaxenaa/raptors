@@ -1,21 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Results &middot; Raptors{% endblock %}
 
-{#
-  The claim in the brief is that harsh and generous judges should not decide the
-  winner. This page is the evidence for that claim: raw beside calibrated, with
-  the rank movement made explicit so the effect is visible rather than asserted.
-#}
-
 {% block body %}
-<header class="workspace-head">
-  <h1>Normalized results</h1>
-  <p class="lede">
-    {{ result.observations }} ballots from {{ result.judges | length }} judges over
-    {{ leaderboard | length }} ranked projects. Method
-    <span class="mono">{{ method }}</span>.
-  </p>
-</header>
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="workspace-head">
+    <h1>Normalized results</h1>
+    <p class="lede">
+      {{ result.observations }} ballots from {{ result.judges | length }} judges
+      across {{ leaderboard | length }} projects.
+    </p>
+  </header>
+</div>
 
 <form method="get" action="/organizer/results" class="panel"
       style="display:flex; gap:12px; align-items:flex-end">
@@ -65,20 +63,11 @@
 
 <div class="panel">
   <p class="sum">
-    The correction is not a per-judge z-score. A z-score divides by a standard
-    deviation that is zero for a judge who scored everything the same, and it is
-    meaningless for a judge with one ballot. Instead the scale is shrunk toward
-    the pool, <code>&sigma;&#771; = (n&sigma; + k&sigma;<sub>pool</sub>)/(n + k)</code>
-    with k = {{ result.params.k_shrink }}, so it can never be zero; and the bias is fitted
-    by a ridge-penalised additive model with
-    &lambda;<sub>judge</sub> = {{ result.params.lambda_judge }} and
-    &lambda;<sub>project</sub> = {{ result.params.lambda_project }}, so a judge
-    with one ballot has only
-    {{ '%.0f' % (100 / (1 + result.params.lambda_judge)) }}% of their residual
-    attributed to bias instead of all of it. Residual sd after the fit is
+    Harsh and generous judges should not decide the winner. Calibration shrinks each
+    judge’s scale toward the pool and fits a small bias, so a single ballot cannot
+    swing a ranking. Residual spread after the fit is
     {{ '%.4f' % result.residual_sd }}.
-    Full derivation and a worked example:
-    <a href="/api/organizer/normalization-proof?event_id={{ event_id }}">proof artefact</a>.
+    <a href="/api/organizer/normalization-proof?event_id={{ event_id }}">How the correction works</a>.
   </p>
 </div>
 
@@ -121,7 +110,7 @@
 </div>
 <p class="sum">
   Rank movement compares the raw ranking with the calibrated one. A project that
-  moves is a project whose position depended on which judges happened to see it.
+  moves was sensitive to which judges happened to see it.
 </p>
 
 <h2>Judge diagnostics</h2>
@@ -151,8 +140,7 @@
   </table>
 </div>
 <p class="sum">
-  A positive bias is a generous judge; the correction subtracts it. The rows
-  flagged <b>flat</b> and <b>single ballot</b> are the two cases that break a
-  naive z-score, and they are present in the published fixture data.
+  A positive bias is a generous judge; the correction subtracts it.
+  <b>Flat</b> means every score was the same. <b>Single ballot</b> means bias is only partly identifiable.
 </p>
 {% endblock %}

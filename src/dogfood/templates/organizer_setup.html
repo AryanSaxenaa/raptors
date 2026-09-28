@@ -2,13 +2,17 @@
 {% block title %}Event setup &middot; Raptors{% endblock %}
 
 {% block body %}
-<header class="workspace-head">
-  <h1>Event setup</h1>
-  <p class="lede">
-    Configure events, tracks, and judges from the UI. Every action below calls the
-    public JSON API documented at <a href="/docs">/docs</a>.
-  </p>
-</header>
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="workspace-head">
+    <h1>Event setup</h1>
+    <p class="lede">
+      Create events, tracks, and judges. Publish results when you are ready.
+    </p>
+  </header>
+</div>
 
 <form class="panel" method="get" action="/organizer/setup" style="display:flex; gap:12px; align-items:flex-end">
   <div style="flex:1">
@@ -28,7 +32,7 @@
     <h3>Create a new event</h3>
     <label for="ev-name">Name</label>
     <input id="ev-name">
-    <label for="ev-close">Submissions close (ISO8601 UTC)</label>
+    <label for="ev-close">Submissions close</label>
     <input id="ev-close" placeholder="2026-03-01T23:59:59Z">
     <div style="margin-top:14px"><button id="create-event">Create event</button></div>
   </div>

@@ -6,25 +6,28 @@
 {% endblock %}
 
 {% block body %}
-<header class="fs-page-head workspace-head">
-  <p class="fs-eyebrow">SITE 03 · JUDGE</p>
-  <h1>Judge console</h1>
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="fs-page-head workspace-head fs-page-head--wave">
+    <p class="fs-eyebrow">JUDGE</p>
+    <h1>Judge console</h1>
 
 {% if not judge %}
-  <div class="notice warn">
-    You are signed in as <b>{{ who.role }}</b> but you are not a judge on this
-    event, so you have no review queue. The role matrix still grants you
-    <code>own_scores</code>; there is simply nothing in it.
+  <div class="notice warn fs-wave-band__notice">
+    You are signed in as <b>{{ who.role }}</b>, and you are not assigned as a judge on this event.
   </div>
 {% else %}
   <p class="lede">
-    {{ judge.display_name }} &middot; tracks
-    <span class="mono">{{ tracks | join(', ') or 'none' }}</span>.
-    You can only see projects in your own tracks &mdash; that is enforced in the
-    backend, by <code>assert_track_visible</code>, not by this page.
+    <b>{{ judge.display_name }}</b>
+    {% if tracks %}
+      &middot; {{ tracks | join(', ') }}
+    {% endif %}
   </p>
 {% endif %}
-</header>
+  </header>
+</div>
 
 {% if judge %}
   {% set done = queue | selectattr('scored') | list | length %}
@@ -61,7 +64,6 @@
           <tr>
             <td>
               <a href="/judge/projects/{{ row.project_id }}">{{ row.title }}</a>
-              <div class="dim mono">{{ row.project_id }}</div>
             </td>
             <td class="dim">{{ row.tagline }}</td>
             <td>{{ row.track_name or '-' }}</td>
@@ -83,20 +85,10 @@
   </div>
 
   <div class="fs-note">
-    <h3>Participation record</h3>
-    <p class="sum">Hash-anchored JSON statement of reviews completed on this event.</p>
-    <button id="cert" class="ghost" type="button">Download judge record</button>
+    <h3>Your judging record</h3>
+    <p class="sum">A signed summary of the reviews you completed on this event.</p>
+    <button id="cert" class="ghost" type="button">Download record</button>
     <pre id="cert-out" class="block" hidden></pre>
-  </div>
-
-  <div class="fs-note">
-    <h3>What you cannot see</h3>
-    <p class="sum">
-      Another judge's ballots, any project outside your tracks, the aggregate
-      leaderboard, and the audit log. Each of those is refused at the API with a
-      403 and a reason code, and the refusal is written to the audit trail. Try
-      it: <code>/api/judge/scores?judge=jdg_02</code>.
-    </p>
   </div>
 {% endif %}
 {% endblock %}

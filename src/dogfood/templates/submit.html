@@ -6,14 +6,18 @@
 {% endblock %}
 
 {% block body %}
-<header class="fs-page-head workspace-head">
-  <p class="fs-eyebrow">SITE 01 · SUBMIT</p>
-  <h1>Submit a project</h1>
-  <p class="lede">
-    Drafts are editable until the deadline. The full field set below is the one the
-    spec gives as a reference, including organizer-defined custom questions.
-  </p>
-</header>
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="fs-page-head workspace-head fs-page-head--wave">
+    <p class="fs-eyebrow">SUBMIT</p>
+    <h1>Submit a project</h1>
+    <p class="lede">
+      Drafts stay editable until the deadline. Submit when the write-up is ready.
+    </p>
+  </header>
+</div>
 
 <form class="fs-event-row" method="get" action="/projects/new">
   <label for="event">Event</label>
@@ -30,9 +34,8 @@
   <div class="fs-banner" role="status">
     {% if closed %}
       <p style="margin:0 0 {% if not who.is_anonymous and not teams %}10px{% else %}0{% endif %}">
-        Submissions for <b>{{ event.name }}</b> closed at
-        <code>{{ event.submissions_close }}</code>. The API will refuse new entries with
-        <code>submissions_closed</code> — pick the open event above to exercise the lifecycle.
+        Submissions for <b>{{ event.name }}</b> closed
+        {{ event.submissions_close }}. Choose an open event above to submit.
       </p>
     {% endif %}
     {% if not who.is_anonymous and not teams %}
@@ -44,7 +47,7 @@
   </div>
 {% elif who.is_anonymous %}
   <div class="fs-banner" role="status">
-    <a href="/login">Sign in</a> as a participant to save drafts and submit.
+    <a href="/login">Sign in</a> to save a draft and submit.
   </div>
 {% endif %}
 
@@ -172,8 +175,7 @@ async function send(submit) {
     const created = await api('POST', '/api/events/{{ event.id }}/projects', payload(submit));
     location.href = submit ? '/projects/' + created.id : '/projects/new?event={{ event.id }}';
   } catch (e) {
-    const code = e.problem && e.problem.code ? ' [' + e.problem.code + ']' : '';
-    flash(e.message + code, 'bad');
+    flash(e.message, 'bad');
   }
 }
 

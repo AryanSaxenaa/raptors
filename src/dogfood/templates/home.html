@@ -12,15 +12,42 @@
     <div id="hero-raptor" class="hero__raptor" data-lottie="{{ static_url('raptor-hero.lottie.json') }}" data-fallback="{{ static_url('raptor-hero.svg') }}" aria-hidden="true"></div>
   </div>
   <div class="hero__copy">
-    <p class="hero__sub">
-      {{ event.name }} &mdash; self-hosted portal for submissions, isolation, and
-      calibrated scores. Seeded with the official fixtures so judges compare software, not demo data.
-    </p>
-    <div class="hero__actions">
-      <a class="btn" href="/projects">Browse gallery</a>
-      <a class="btn ghost" href="/docs">OpenAPI</a>
-      <a class="btn ghost" href="/login">Sign in</a>
-    </div>
+    {% if who.is_anonymous %}
+      <p class="hero__sub">
+        Raptors runs the event: submissions, private judging, community votes, and published results.
+      </p>
+      <div class="hero__actions">
+        <a class="btn" href="/projects">Browse gallery</a>
+        <a class="btn ghost" href="/projects/new">Submit a project</a>
+        <a class="btn ghost" href="/login">Sign in</a>
+      </div>
+    {% elif who.role == 'participant' %}
+      <p class="hero__sub">
+        Welcome back, {{ who.name }}. Join a team, submit your project, and spend community credits in the gallery.
+      </p>
+      <div class="hero__actions">
+        <a class="btn" href="/projects/new">Submit a project</a>
+        <a class="btn ghost" href="/teams">Your teams</a>
+        <a class="btn ghost" href="/projects">Gallery</a>
+      </div>
+    {% elif who.role == 'judge' %}
+      <p class="hero__sub">
+        Welcome back, {{ who.name }}. Score the projects in your queue. Other judges’ ballots stay private.
+      </p>
+      <div class="hero__actions">
+        <a class="btn" href="/judge">Open your queue</a>
+        <a class="btn ghost" href="/projects">Gallery</a>
+      </div>
+    {% else %}
+      <p class="hero__sub">
+        {{ event.name }} is live. Track coverage, publish results, and keep an audit trail of every decision.
+      </p>
+      <div class="hero__actions">
+        <a class="btn" href="/organizer">Organizer console</a>
+        <a class="btn ghost" href="/organizer/results">Results</a>
+        <a class="btn ghost" href="/projects">Gallery</a>
+      </div>
+    {% endif %}
   </div>
 </section>
 {% endblock %}
@@ -85,7 +112,7 @@
       <div class="stat"><div class="n">{{ counts.tracks }}</div><div class="k">tracks</div></div>
     </div>
     <p class="band__quote">
-      One portal for teams, judges, and organizers—from first commit to final scores.
+      One place for teams, judges, and organizers—from first commit to final scores.
     </p>
     <div class="band__scatter" aria-hidden="true">
       <span class="s1">Project gallery</span>
@@ -98,18 +125,27 @@
   </div>
 </section>
 
-<p class="lede" style="margin-top:36px">
-  Submissions closed at <code>{{ event.submissions_close }}</code> on the fixture event.
-  The deadline is enforced in the API before validation runs.
-</p>
+{% if event.submissions_close %}
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <p class="lede" style="margin:0">
+    Submissions for <b>{{ event.name }}</b> closed {{ event.submissions_close }}.
+    {% if who.is_anonymous %}
+      Browse the gallery, or sign in to vote and comment.
+    {% elif who.role == 'participant' %}
+      You can still edit a draft on an open event. Pick the event on Submit.
+    {% endif %}
+  </p>
+</div>
+{% endif %}
 
-{% if duplicates %}
-  <h2>Flagged on import</h2>
+{% if can_aggregate and duplicates %}
+  <h2>Possible duplicates</h2>
   <div class="panel">
     <p class="sum">
-      The importer detected a re-submission of the same work by the same team and
-      annotated it rather than dropping it. Nothing was discarded, and the
-      duplicate's ballots stay in the judge-calibration data.
+      These submissions look like the same work from the same team. Confirm or dismiss each one before you publish.
     </p>
     <div class="scroll"><table>
       <thead><tr>
@@ -120,7 +156,7 @@
       <tbody>
         {% for d in duplicates %}
           <tr>
-            <td><a href="/projects/{{ d.project_id }}">{{ d.project_id }}</a> {{ d.title }}</td>
+            <td><a href="/projects/{{ d.project_id }}">{{ d.title }}</a></td>
             <td><a href="/projects/{{ d.duplicate_of }}">{{ d.duplicate_of }}</a></td>
             <td class="dim">{{ d.reason }}</td>
             <td class="num">{{ d.reviews_on_duplicate }}</td>
@@ -133,42 +169,58 @@
   </div>
 {% endif %}
 
-<h2>Where to look</h2>
+<h2>Jump in</h2>
 <div class="grid c2">
   <div class="panel">
-    <h3>For a reviewer</h3>
+    <h3>
+      {% if who.is_anonymous %}For everyone
+      {% elif who.role == 'participant' %}For your team
+      {% elif who.role == 'judge' %}For judging
+      {% else %}For organizers{% endif %}
+    </h3>
     <ul>
-      <li><a href="/projects">Public gallery</a> with search, track filters, comments, and quadratic community votes, rendered server-side.</li>
-      <li><a href="/api/auth/matrix">The role-isolation matrix as served</a>: compare it with the
-          published figure.</li>
-      <li><a href="/organizer/audit">Audit trail</a> (organizer): authorisation denials appear
-          here, including the one the acceptance suite provokes.</li>
-      <li><a href="/organizer/results">Normalized results</a> (organizer): raw against
-          calibrated, with rank movement.</li>
-      <li><a href="/docs">OpenAPI browser</a>: every action the UI performs.</li>
+      <li><a href="/projects">Gallery</a> — browse projects, comment, and vote.</li>
+      {% if who.is_anonymous or who.role == 'participant' %}
+        <li><a href="/teams">Teams</a> — create a team or join with an invite code.</li>
+        <li><a href="/projects/new">Submit</a> — save a draft, then publish before the deadline.</li>
+      {% endif %}
+      {% if is_judge %}
+        <li><a href="/judge">Judge console</a> — score only the projects assigned to you.</li>
+      {% endif %}
+      {% if can_aggregate %}
+        <li><a href="/organizer">Coverage</a> — assignments, under-reviewed projects, and exports.</li>
+        <li><a href="/organizer/results">Results</a> — raw scores beside calibrated ranks.</li>
+      {% endif %}
+      {% if can_audit %}
+        <li><a href="/organizer/audit">Audit trail</a> — every write and access denial, in order.</li>
+      {% endif %}
+      {% if who.is_anonymous %}
+        <li><a href="/login">Sign in</a> — use the account your organizer sent you.</li>
+      {% endif %}
     </ul>
   </div>
   <div class="panel">
     <h3>Events</h3>
     <div class="scroll"><table>
-      <thead><tr><th>Event</th><th>Submissions close</th><th></th></tr></thead>
+      <thead><tr><th>Event</th><th>Submissions</th><th></th></tr></thead>
       <tbody>
       {% for e in events %}
         <tr>
-          <td>{{ e.name }} <span class="dim mono">{{ e.id }}</span></td>
-          <td class="mono">{{ e.submissions_close or 'open' }}</td>
+          <td>{{ e.name }}</td>
+          <td>{% if e.submissions_close %}{{ e.submissions_close }}{% else %}Open{% endif %}</td>
           <td>
-            {% if e.is_fixture %}<span class="badge">fixture data</span>
-            {% else %}<span class="badge ok">open for submissions</span>{% endif %}
+            {% if e.submissions_close %}
+              <span class="badge">Closed</span>
+            {% else %}
+              <span class="badge ok">Open</span>
+            {% endif %}
           </td>
         </tr>
       {% endfor %}
       </tbody>
     </table></div>
     <p class="sum" style="margin-top:10px">
-      The fixture event is closed, which is correct and is what the acceptance
-      suite checks. The second event exists so the submit, edit and deadline
-      lifecycle can actually be exercised; it holds no fixture data.
+      Switch events from Submit, Teams, or the gallery when more than one is running.
     </p>
   </div>
 </div>

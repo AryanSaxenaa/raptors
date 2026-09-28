@@ -25,7 +25,7 @@
       </p>
     {% else %}
       <h1 class="login-card__title">Sign in</h1>
-      <p class="login-card__sub">Use your email and password to access voting, teams, and submissions.</p>
+      <p class="login-card__sub">Use the email and password your organizer sent you.</p>
 
       <div id="flash" class="notice login-card__flash" hidden></div>
 
@@ -43,8 +43,8 @@
 
       {% if settings.dev_tokens %}
         <p class="login-card__hint">
-          Demo accounts use the password <code>dogfood</code> (for example
-          <span class="mono">organizer@dogfood.local</span>).
+          Demo accounts on this instance use the password <code>dogfood</code>
+          (for example <span class="mono">organizer@dogfood.local</span>).
         </p>
       {% endif %}
     {% endif %}
@@ -52,8 +52,8 @@
 
   {% if settings.dev_tokens and who.is_anonymous %}
     <section class="login-dev" aria-labelledby="login-dev-heading">
-      <h2 id="login-dev-heading" class="login-dev__title">Development quick sign-in</h2>
-      <p class="login-dev__sub">Fixed session tokens for local review and acceptance tests.</p>
+      <h2 id="login-dev-heading" class="login-dev__title">Try a demo account</h2>
+      <p class="login-dev__sub">Jump in as a seeded role to see the product from that seat.</p>
       <ul class="login-dev__list">
         {% for l in seeded_logins %}
           <li>
@@ -66,23 +66,6 @@
       </ul>
     </section>
   {% endif %}
-
-  <details class="login-advanced">
-    <summary>API examples for reviewers</summary>
-    <pre class="login-code"># public gallery (no credential)
-curl -s localhost:8080/projects | grep -o 'Glass Signal'
-
-# judge reads own scores
-curl -s -H 'Cookie: df_session=jdg_a_91bc' localhost:8080/api/judge/scores
-
-# peer access denied (403) + audit entry
-curl -s -o /dev/null -w '%{http_code}\n' \
-  -H 'Cookie: df_session=jdg_b_44de' 'localhost:8080/api/judge/scores?judge=jdg_01'
-
-# organizer may read peer scores
-curl -s -o /dev/null -w '%{http_code}\n' \
-  -H 'Cookie: df_session=org_7f2a' 'localhost:8080/api/judge/scores?judge=jdg_01'</pre>
-  </details>
 </div>
 {% endblock %}
 

@@ -18,26 +18,31 @@
 #}
 
 {% block body %}
-<header class="fs-page-head gallery-head">
-  <p class="fs-eyebrow">SITE 02 · GALLERY</p>
-  <h1 class="gallery-head__title">Projects <span class="gallery-head__count">({{ total }})</span></h1>
-  <p class="lede gallery-head__lede">
-    Public submissions — browse, filter, comment, and spend quadratic credits from this page.
-    {% if filters.sort == 'arrival' and not filters.q and not filters.track and not filters.tag %}
-      Listed in arrival order.
-    {% endif %}
-  </p>
-</header>
+<div class="fs-wave-band">
+  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
+    <canvas data-fx="waves"></canvas>
+  </div>
+  <header class="fs-page-head gallery-head fs-page-head--wave">
+    <p class="fs-eyebrow">GALLERY</p>
+    <h1 class="gallery-head__title">Projects <span class="gallery-head__count">({{ total }})</span></h1>
+    <p class="lede gallery-head__lede">
+      Browse submissions, filter by track, and leave comments.
+      {% if who.is_anonymous %}
+        Sign in to spend community credits.
+      {% else %}
+        Spend community credits from any project card.
+      {% endif %}
+    </p>
+  </header>
+</div>
 
 <section class="fs-vote-intro" id="community-vote" aria-labelledby="community-vote-heading">
   <p class="section-label">Community vote</p>
   <h2 id="community-vote-heading">Quadratic credits</h2>
   <p class="fs-vote-intro__lede">
-    Spend up to <b>{{ credit_budget }}</b> credits across projects for
-    <b>{{ vote_event.name }}</b>. Influence on each project is the square root of
-    credits you assign there, so piling the budget on one favourite buys less
-    and less. Ballot order is shuffled per voter on the API; this gallery stays
-    in listing order.
+    You have <b>{{ credit_budget }}</b> credits for <b>{{ vote_event.name }}</b>.
+    Influence on a project is the square root of the credits you put there, so
+    stacking the budget on one favourite buys less and less.
   </p>
   <form class="fs-vote-event" method="get" action="/projects">
     {% if filters.q %}<input type="hidden" name="q" value="{{ filters.q }}">{% endif %}
@@ -57,7 +62,7 @@
     </div>
     <p class="fs-credit-strip__label ballot-budget" id="budget">
       {% if who.is_anonymous %}
-        <a href="/login">Sign in</a> to spend quadratic credits on projects.
+        <a href="/login">Sign in</a> to spend credits on projects.
       {% else %}
         Loading your credit budget…
       {% endif %}
@@ -66,10 +71,9 @@
   <div id="flash" class="notice" hidden></div>
   <p class="fs-vote-note sum">
     {% if show_vote_tallies %}
-      Vote tallies are visible because results are published, or you are an organizer.
+      Vote totals are visible for this event.
     {% else %}
-      Community tallies stay embargoed until the organizer publishes.
-      Organizers can inspect them at <code>/api/events/{{ vote_event.id }}/vote-results</code>.
+      Vote totals stay private until the organizer publishes results.
     {% endif %}
   </p>
 </section>
@@ -180,7 +184,6 @@
               {% else %}
                 <span class="dim">No track</span>
               {% endif %}
-              <span class="gallery-card__id dim">{{ p.id }}</span>
             </footer>
             {% if p.event_id == vote_event.id and not p.is_duplicate %}
               {% if who.is_anonymous %}
