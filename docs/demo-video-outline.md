@@ -1,6 +1,8 @@
 # Demo video outline (~5 minutes)
 
-Suggested script for the submission video. Record against a **fresh** portal (`python -m dogfood reset && python -m dogfood serve`).
+This is the remaining submission deliverable. The portal is ready; the clip is not in the repo yet.
+
+Record against a **fresh** portal (`python -m dogfood reset && python -m dogfood serve`, or `docker compose up --build`). Keep one API 403 visible so judges see isolation in the backend, not a hidden button.
 
 1. **Intro (30s)** — What the portal is; show `acceptance-report.txt` and `smoke-report.txt` green in the repo.
 2. **Public gallery (45s)** — `/projects` without login; fixture titles in HTML; search/filter.

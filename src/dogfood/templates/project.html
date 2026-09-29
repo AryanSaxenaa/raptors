@@ -138,7 +138,7 @@
     {% if can_vote and not who.is_anonymous %}
       <section class="project-section project-vote-panel" id="project-vote" hidden>
         <h2 class="project-section__title">Community vote</h2>
-        <p class="sum">You can spend up to <b>{{ credit_budget }}</b> credits here. Influence is the square root of credits on this project.</p>
+        <p class="sum">Up to <b>{{ credit_budget }}</b> credits on this project. Influence is the square root of credits spent.</p>
         <div class="project-vote-row">
           <label class="ballot-item__credits">
             Credits
@@ -184,7 +184,7 @@
     </div>
     <p class="sum project-cert">
       <a href="/certificates/{{ project.id }}">Certificate</a>
-      <span class="dim">available after results are published</span>
+      <span class="dim">issued after results are published</span>
     </p>
   </aside>
 </div>

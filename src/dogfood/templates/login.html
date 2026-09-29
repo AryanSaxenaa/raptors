@@ -15,11 +15,19 @@
       </p>
       <button type="button" class="login-card__submit" id="signout">Sign out</button>
       <p class="login-card__footer">
-        <a href="/projects">Continue to gallery</a>
+        {% if who.role == 'judge' %}
+          <a href="/judge">Continue to your queue</a>
+        {% elif who.role == 'organizer' or who.role == 'admin' %}
+          <a href="/organizer">Continue to the console</a>
+        {% elif who.role == 'participant' %}
+          <a href="/projects/new">Continue to submit</a>
+        {% else %}
+          <a href="/projects">Continue to gallery</a>
+        {% endif %}
       </p>
     {% else %}
       <h1 class="login-card__title">Sign in</h1>
-      <p class="login-card__sub">Use the email and password your organizer sent you.</p>
+      <p class="login-card__sub">The credentials your organizer issued.</p>
 
       <div id="flash" class="notice login-card__flash" hidden></div>
 
@@ -47,7 +55,7 @@
   {% if settings.dev_tokens and who.is_anonymous %}
     <section class="login-dev" aria-labelledby="login-dev-heading">
       <h2 id="login-dev-heading" class="login-dev__title">Try a demo account</h2>
-      <p class="login-dev__sub">Jump in as a seeded role to see the product from that seat.</p>
+      <p class="login-dev__sub">Open the portal as organizer, judge, or participant — same seeded data for every review.</p>
       <ul class="login-dev__list">
         {% for l in seeded_logins %}
           <li>

@@ -24,6 +24,7 @@
     {% if tracks %}
       &middot; {{ tracks | join(', ') }}
     {% endif %}
+    &mdash; assigned work only. Peer scores are denied at the API.
   </p>
 {% endif %}
   </header>
@@ -94,7 +95,7 @@
 
   <div class="fs-note">
     <h3>Your judging record</h3>
-    <p class="sum">A signed summary of the reviews you completed on this event.</p>
+    <p class="sum">A signed, publicly verifiable summary of the reviews you completed on this event.</p>
     <button id="cert" class="ghost" type="button">Download record</button>
     <pre id="cert-out" class="block" hidden></pre>
   </div>

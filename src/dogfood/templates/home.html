@@ -14,7 +14,7 @@
   <div class="hero__copy">
     {% if who.is_anonymous %}
       <p class="hero__sub">
-        Raptors runs the event: submissions, private judging, community votes, and published results.
+        Isolated judging, quadratic votes, and results you can defend.
       </p>
       <div class="hero__actions">
         <a class="btn" href="/projects">Browse gallery</a>
@@ -23,7 +23,7 @@
       </div>
     {% elif who.role == 'participant' %}
       <p class="hero__sub">
-        Welcome back, {{ who.name }}. Join a team, submit your project, and spend community credits in the gallery.
+        Form a team, submit before the deadline, and vote with quadratic credits.
       </p>
       <div class="hero__actions">
         <a class="btn" href="/projects/new">Submit a project</a>
@@ -32,7 +32,7 @@
       </div>
     {% elif who.role == 'judge' %}
       <p class="hero__sub">
-        Welcome back, {{ who.name }}. Score the projects in your queue. Other judges’ ballots stay private.
+        Score your queue. Peer ballots stay private, including from the API.
       </p>
       <div class="hero__actions">
         <a class="btn" href="/judge">Open your queue</a>
@@ -40,7 +40,7 @@
       </div>
     {% else %}
       <p class="hero__sub">
-        {{ event.name }} is live. Track coverage, publish results, and keep an audit trail of every decision.
+        Watch coverage, calibrate ranks, and publish when the chain is ready.
       </p>
       <div class="hero__actions">
         <a class="btn" href="/organizer">Organizer console</a>
@@ -112,15 +112,15 @@
       <div class="stat"><div class="n">{{ counts.tracks }}</div><div class="k">tracks</div></div>
     </div>
     <p class="band__quote">
-      One place for teams, judges, and organizers—from first commit to final scores.
+      Running a hackathon is a data problem wearing a party hat.
     </p>
     <div class="band__scatter" aria-hidden="true">
-      <span class="s1">Project gallery</span>
-      <span class="s2">Team signup</span>
-      <span class="s3">Judge ballots</span>
-      <span class="s4">Community vote</span>
-      <span class="s5">Submit &amp; edit</span>
-      <span class="s6">Results publish</span>
+      <span class="s1">Public gallery</span>
+      <span class="s2">Team invite</span>
+      <span class="s3">Isolated ballots</span>
+      <span class="s4">Quadratic vote</span>
+      <span class="s5">Deadline holds</span>
+      <span class="s6">Publish results</span>
     </div>
   </div>
 </section>
@@ -129,7 +129,7 @@
   <h2>Possible duplicates</h2>
   <div class="panel">
     <p class="sum">
-      These submissions look like the same work from the same team. Confirm or dismiss each one before you publish.
+      These submissions look like the same work from the same team. Confirm or dismiss each one before you publish. Confirmed duplicates drop from the ranking; their ballots still count when we calibrate judges.
     </p>
     <div class="scroll"><table>
       <thead><tr>
@@ -153,33 +153,33 @@
   </div>
 {% endif %}
 
-<h2>Jump in</h2>
+<h2>Start here</h2>
 <div class="grid c2 home-jump-in">
   <div class="panel home-jump-in__panel">
     <h3>
-      {% if who.is_anonymous %}For everyone
-      {% elif who.role == 'participant' %}For your team
-      {% elif who.role == 'judge' %}For judging
-      {% else %}For organizers{% endif %}
+      {% if who.is_anonymous %}The portal
+      {% elif who.role == 'participant' %}Your team
+      {% elif who.role == 'judge' %}Your queue
+      {% else %}The console{% endif %}
     </h3>
     <ul class="home-jump-in__list">
-      <li><a href="/projects">Gallery</a> — browse projects, comment, and vote.</li>
+      <li><a href="/projects">Gallery</a> — public projects, comments, and quadratic voting.</li>
       {% if who.is_anonymous or who.role == 'participant' %}
         <li><a href="/teams">Teams</a> — create a team or join with an invite code.</li>
-        <li><a href="/projects/new">Submit</a> — pick an open event, save a draft, then publish before its deadline.</li>
+        <li><a href="/projects/new">Submit</a> — draft until the deadline; the deadline actually holds.</li>
       {% endif %}
       {% if is_judge %}
-        <li><a href="/judge">Judge console</a> — score only the projects assigned to you.</li>
+        <li><a href="/judge">Judge console</a> — score only what is assigned to you.</li>
       {% endif %}
       {% if can_aggregate %}
-        <li><a href="/organizer">Coverage</a> — assignments, under-reviewed projects, and exports.</li>
-        <li><a href="/organizer/results">Results</a> — raw scores beside calibrated ranks.</li>
+        <li><a href="/organizer">Coverage</a> — who has not started, and which projects are thin.</li>
+        <li><a href="/organizer/results">Results</a> — raw means beside calibrated ranks.</li>
       {% endif %}
       {% if can_audit %}
-        <li><a href="/organizer/audit">Audit trail</a> — every write and access denial, in order.</li>
+        <li><a href="/organizer/audit">Audit trail</a> — every write and every access denial, in order.</li>
       {% endif %}
       {% if who.is_anonymous %}
-        <li><a href="/login">Sign in</a> — use the email and password your organizer sent you.</li>
+        <li><a href="/login">Sign in</a> — the credentials your organizer issued.</li>
       {% endif %}
     </ul>
   </div>
@@ -218,18 +218,18 @@
     {% if events | length > 1 %}
     <p class="sum home-jump-in__foot">
       {% if can_submit %}
-        Choose the event on Submit, Teams, or the gallery when more than one is active.
+        Pick the event on Submit, Teams, or the gallery when more than one is live.
       {% elif is_judge %}
-        Choose the event on the gallery or judge console when more than one is active.
+        Pick the event on the gallery or judge console when more than one is live.
       {% elif can_aggregate %}
-        Choose the event on the organizer console when more than one is active.
+        Pick the working event on the organizer console when more than one is live.
       {% else %}
-        Choose the event on the gallery when more than one is active.
+        Pick the event on the gallery when more than one is live.
       {% endif %}
     </p>
     {% else %}
     <p class="sum home-jump-in__foot">
-      All gallery and judging activity uses this event.
+      Gallery, judging, and results all use this event.
     </p>
     {% endif %}
   </div>

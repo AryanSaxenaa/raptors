@@ -1,143 +1,147 @@
-# Dogfood Portal
+# Raptors
 
-Self-hostable hackathon submission and judging platform for [DOGFOOD 2026](https://dogfoodhack.com). Python 3.12, FastAPI, SQLite, server-rendered gallery, JSON API for writes.
+The judging platform we would actually run.
 
-**Submitting:** [SUBMISSION.md](SUBMISSION.md) lists required artefacts; [docs/demo-video-outline.md](docs/demo-video-outline.md) is a ~5 minute demo script.
-
-## Requirement → artefact → test
-
-| Requirement | Artefact | How to verify |
-| --- | --- | --- |
-| T1 public gallery + fixture titles | `GET /projects`, `routers/web.py` | `python run.py .dogfood.toml`; `pytest tests/test_acceptance_invariants.py` |
-| T2 own vs peer judge scores | `security.py`, `GET /api/judge/scores` | `run.py`; `pytest tests/test_role_matrix.py` |
-| T2 CSV export | `exports.py`, `GET /api/exports/*.csv` | `run.py`; `pytest tests/test_csv.py` |
-| R14 deadline before validation | `routers/web.py` | `pytest tests/test_deadline.py` |
-| R21 track isolation (25-cell matrix) | `security.py` `ROLE_MATRIX` | `pytest tests/test_role_matrix.py` |
-| R30 audit trail | `audit.py`, `/organizer/audit`, `GET /api/audit/verify` | `pytest tests/test_adversarial.py`; portal after login |
-| R41 import/export | `exports.py`, `docs/migration.md` | Organizer JSON + CSV routes; migration doc |
-| R42 normalization proof | `JUDGING.md`, `docs/normalization-proof.txt`, `normalize.py` | `python -m dogfood.normalize --proof --fixtures fixtures.json`; `pytest tests/test_normalize.py` |
-| R45 API-first | `/docs`, `/openapi.json`, `docs/openapi.json` | `python -m dogfood export-openapi` |
-| R44 threat model | `THREAT-MODEL.md` | Read file (mitigations + explicit gaps) |
-| R16 full submission fields | `DATA-MODEL.md`, `schema.sql`, `/projects/new` | Schema + form fields |
-| Architecture | `ARCHITECTURE.md` | Request path + trust boundary |
-| Scale (~400 projects) | `tests/test_scale.py` | `pytest tests/test_scale.py` |
-| Duplicate handling | `seed.py`, `prj_41` | `pytest tests/test_duplicates.py` |
-
-OpenAPI: [docs/openapi.json](docs/openapi.json) (also live at `/openapi.json` when serving).
-
-## What this does not do yet
-
-- **Pairwise judging** — Bradley–Terry mode sketched in `JUDGING.md`, not implemented.
-- **X.509 / CA-signed certificates** — judge records and project certificates are hash-anchored JSON (`/api/records/{hash}`), not a public-key infrastructure.
-- **T3/T4 in `.dogfood.toml`** — still only **T1/T2 claimed** because `run.py` verifies those tiers only.
-- **Production hardening** — dev tokens default on in local/Docker demo config; set `DOGFOOD_DEV_TOKENS=0` for real deployments.
-- **DDoS / multi-tenant isolation** — see `THREAT-MODEL.md`.
-
-## UI surfaces
-
-| Page | URL |
-| --- | --- |
-| Teams | `/teams` |
-| Community vote | `/projects#community-vote` (`/vote` redirects) |
-| Organizer setup | `/organizer/setup` |
-| Webhooks | `/organizer/webhooks` |
-| Embeddable gallery | `/embed/gallery` + `/static/embed.js` |
-| Project certificate | `/certificates/{project_id}` |
-
-Details: [docs/ui-coverage.md](docs/ui-coverage.md).
-
-## Quick start
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate          # Windows
-pip install -r requirements.txt
-set PYTHONPATH=src
-set DOGFOOD_DEV_TOKENS=1
-python -m dogfood init
-python -m dogfood serve
-```
-
-In another terminal:
-
-```bash
-python run.py .dogfood.toml > acceptance-report.txt
-python -m pytest tests/ -q --ignore=tests/smoke.py
-python tests/smoke.py    # black-box; auto-resets DB on localhost before running
-```
-
-Docker:
+Isolated ballots, a weighted rubric, documented cross-judge calibration, quadratic community voting, and a hash-chained audit trail. Built for [DOGFOOD 2026](https://dogfoodhack.com): FastAPI, SQLite, server-rendered HTML, JSON for every write. No cloud account, no hosted database, no auth vendor.
 
 ```bash
 docker compose up --build
 ```
 
-Portal: http://localhost:8080
+Portal: [http://localhost:8080](http://localhost:8080)
 
-**Build vs run:** image build needs network once (`apt-get`, `pip`). After that, `docker compose up` uses only the container, SQLite on a volume, and bundled fixtures — no external services at runtime.
+**Claimed and verified: T1 and T2.** T3 and T4 ship in this repo; they are not claimed in `.dogfood.toml` because `run.py` cannot verify them. That is the honest receipt.
 
-## Acceptance (what `run.py` checks)
+---
 
-| Check | Route / behaviour |
+## What it is
+
+Hackathon judging is a data problem wearing a party hat. Incumbents ship a gallery and a CSV and then stop: they cannot weight criteria, they will not publish how they normalize, community votes are conceded to be gameable, and none of them has a public API.
+
+Raptors is the rest of that product:
+
+| Stage | What you get |
 | --- | --- |
-| T1 gallery public | `GET /projects` → 200, fixture titles in HTML body |
-| T1 fixture visible | First three fixture project names on page one |
-| T1 deadline | `POST /api/events/evt_01/projects` as participant → 4xx, `submissions_closed` |
-| T2 own scores | `GET /api/judge/scores` as judge_a → 200 |
-| T2 peer isolation | `GET /api/judge/scores?judge=jdg_01` as judge_b → 401/403 |
-| T2 participant blocked | `GET /api/judge/scores` as participant → 401/403 |
-| T2 CSV | `GET /api/exports/results.csv` as organizer → 200, comma in header |
+| Teams | Invite codes, not a mailing list |
+| Submissions | Full field set; drafts until the deadline; the deadline actually holds |
+| Gallery | Public, searchable, filterable; titles in the HTML so the checker can grep them |
+| Assignment | Track-scoped, conflict-free, least-loaded first |
+| Scoring | Organizer-weighted rubric; judges see only their queue |
+| Isolation | 25-cell role matrix in `security.py`, denied at the API, audited |
+| Normalization | Shrunken scale + ridge additive model; fixture proof committed |
+| Voting | Quadratic credits; shuffled ballots; results embargoed until publish |
+| Certificates | Hash-anchored JSON anyone can fetch; not a fake PKI |
+| Archive | CSV at every stage, full event JSON in and out, hash-chained audit log |
 
-`.dogfood.toml` sets `claimed = ["T1", "T2"]` so the report footer is clean (`claimed T1 T2, verified T1 T2`). Extra T3/T4 work (comments, voting API, exports, audit) exists in the repo but is not claimed in the config because the checker cannot verify it.
+---
 
-## Key design choices
-
-- **Gallery on the server** — fixture titles must appear in the raw HTML response; client rendering would pass the grep check only in a browser.
-- **`peer_scores` explicit** — without it, `run.py` falls back to `judge_scores` and judge B’s own empty list returns 200, failing isolation.
-- **Deadline before validation** — closed events return `submissions_closed`, not field errors.
-- **Role matrix in code** — `src/dogfood/security.py`; denials audited as `authorization.denied`.
-- **Normalization** — shrunken per-judge scale (never zero) plus ridge-penalised additive model; proof at `/api/organizer/normalization-proof` and `docs/normalization-proof.txt`.
-- **Duplicates** — `prj_41` flagged; excluded from ranking, ballots kept for calibration.
-
-## Tests
+## One command
 
 ```bash
-python -m pytest tests/ -q --ignore=tests/smoke.py   # ~65 tests; ~10 min locally (each test re-seeds fixtures)
-python tests/smoke.py    # black-box; 193 checks; use a fresh DB for strict counts
+docker compose up --build
 ```
 
-CI runs the same pytest command on push (`.github/workflows/ci.yml`). For a clean smoke run against a remote host, point `python tests/smoke.py http://host:port` at the target. On `localhost`, smoke resets the database first via `python -m dogfood reset`.
+That is the product. Image build needs network once (`apt-get`, `pip`). After that the container uses SQLite on a volume and bundled `fixtures.json`. No outbound calls except webhooks an organizer registered.
 
-## Beyond the verified tiers
+Local, without Docker:
 
-Shipped in code but not in `run.py`: community **comments** and **quadratic voting** (UI on `/projects`; `/vote` redirects there), **webhooks** (API + `/organizer/webhooks`), **embeddable gallery** (`/embed/gallery`, `embed.js`), bulk import/export, hash-chained audit log, **public records** (`/api/records/{hash}`), **project certificates** after publish.
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # Windows; source .venv/bin/activate elsewhere
+pip install -r requirements.txt
+set PYTHONPATH=src              # export PYTHONPATH=src
+set DOGFOOD_DEV_TOKENS=1
+python -m dogfood init
+python -m dogfood serve
+```
 
-## Layout
+Seeded demo logins (password `dogfood` when tokens are on): organizer, judge_a, judge_b, participant. Tokens also work as `Cookie: df_session=…` or `Authorization: Bearer …` — the values in `.dogfood.toml`.
+
+---
+
+## Receipt
 
 ```
-src/dogfood/          application
-  security.py         role matrix and sessions
-  normalize.py        calibration engine
-  seed.py             fixture ingest
-  routers/            HTTP surface
-fixtures.json         sample event
-run.py                acceptance checker
-.dogfood.toml         routes and test credentials
-ARCHITECTURE.md       request path and trust boundary
-DATA-MODEL.md         schema and import/export
-JUDGING.md            assignment, rubric, normalization
-THREAT-MODEL.md       mitigations and non-claims
-docs/migration.md     move between hosts
-docs/ui-coverage.md   which flows have HTML vs API-only
-docs/openapi.json     committed OpenAPI snapshot
+python run.py .dogfood.toml
 ```
+
+Committed at [`acceptance-report.txt`](acceptance-report.txt):
+
+```
+claimed T1 T2, verified T1 T2
+```
+
+All seven checker lines PASS. The suite never logs in; it attaches the headers we printed at boot. `peer_scores` is an explicit URL (`/api/judge/scores?judge=jdg_01`) so judge B probing judge A is a real cross-judge read, not an empty own-list 200.
+
+Our tests beyond the checker:
+
+```bash
+python -m pytest tests/ -q --ignore=tests/smoke.py
+python tests/smoke.py            # black-box; resets the local DB first
+```
+
+---
+
+## How far we climbed
+
+**T1 — Core.** Auth and sessions. Five roles (visitor, participant, judge, organizer, admin). Events with dates, tracks, and prizes. Team invite codes. Draft-and-edit until close. Deadline refused **before** body validation. Public gallery with search and track filter. Submission fields the brief lists as stable across platforms.
+
+**T2 — Judging.** Invite and assign (batch at seed, algorithmic top-up). Weighted, per-event rubric. Role isolation in the backend, including track scope and assignment. Organizer progress (who has not started, which projects are thin). Cross-judge normalization, documented in [`JUDGING.md`](JUDGING.md) and proven on the fixture. CSV at every stage.
+
+**T3 — Public (shipped, not claimed).** Quadratic voting (influence = √credits). Comments. Results hidden from everyone but organizers until publish. Ballot order shuffled per voter. Rate limits, duplicate detection, audit trail an organizer can read without a database client.
+
+**T4 — Stretch (shipped, not claimed).** REST API + OpenAPI (`/docs`, `/openapi.json`). Webhooks, HMAC-signed, outbox so a dead endpoint cannot stall a ballot. Judge participation records and project certificates, publicly fetchable at `/api/records/{hash}`. Embeddable gallery (`/embed/gallery`, `/static/embed.js`). Bulk import and export so an organizer can leave.
+
+Bonuses we nailed: **normalization proof**, **threat model**, **API-first**. Bonus we did not start: pairwise / Bradley–Terry. The brief says pick one hard bonus and finish it.
+
+---
+
+## What this does not do yet
+
+- **Pairwise judging** — sketched in `JUDGING.md`, not implemented. Normalization is the gap every incumbent claims and none publishes; that is the hard bonus we took.
+- **X.509 certificates** — records are hash-anchored JSON, not a public-key infrastructure.
+- **T3/T4 in `.dogfood.toml`** — still only T1/T2 claimed. Claiming further would print `claimed but not verified` on a receipt that is otherwise clean.
+- **Organizer HTML for every config knob** — prizes, custom questions, and rubric rows are full API surfaces; the setup page covers events, tracks, judges, and the voting window.
+- **Demo video** — outline at [`docs/demo-video-outline.md`](docs/demo-video-outline.md). Record it before you submit. The portal is ready; the clip is the remaining human deliverable.
+- **Production hardening** — `DOGFOOD_DEV_TOKENS=1` is on in Docker so the checker can attach cookies. Set it to `0` for a real event. See `THREAT-MODEL.md`.
+
+---
+
+## Surfaces
+
+| Who | Where |
+| --- | --- |
+| Anyone | `/` `/projects` `/login` `/docs` |
+| Participant | `/teams` `/projects/new` gallery vote |
+| Judge | `/judge` `/judge/projects/{id}` |
+| Organizer | `/organizer` `/organizer/setup` `/organizer/results` `/organizer/audit` `/organizer/webhooks` |
+| Embed | `/embed/gallery` + `/static/embed.js` |
+| Records | `/api/records/{hash}` `/certificates/{project_id}` (after publish) |
+
+Nav hides pages the signed-in role cannot use. Isolation is still a 403 if you type the URL.
+
+---
+
+## Why the shape
+
+- **Gallery is server-rendered.** `run.py` greps raw HTTP for fixture titles. A React shell looks perfect and fails T1.
+- **One write surface.** The UI `fetch()`es `/api/*`. There is no privileged form-post path.
+- **Deadline before validation.** A closed event returns `submissions_closed`, even on malformed JSON.
+- **Matrix in one file.** `src/dogfood/security.py`. Tests walk all 25 cells over HTTP.
+- **Normalization is published.** Shrunken per-judge scale (never divide by zero on the flat judge) plus ridge ALS. Proof: `docs/normalization-proof.txt`, `GET /api/organizer/normalization-proof`.
+- **Duplicates are annotated, not deleted.** `prj_41` is out of the ranking; those ballots still calibrate the judges who saw both copies.
+
+Deeper: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`DATA-MODEL.md`](DATA-MODEL.md), [`JUDGING.md`](JUDGING.md), [`THREAT-MODEL.md`](THREAT-MODEL.md). Engineering decisions: [`PLAN.md`](PLAN.md). Spec reading: [`INTEL.md`](INTEL.md). Forensic checklist: [`SUBMISSION.md`](SUBMISSION.md).
+
+---
 
 ## Environment
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DOGFOOD_DEV_TOKENS` | off | Fixed session tokens for `.dogfood.toml` / acceptance |
-| `DOGFOOD_DB` | `var/dogfood.sqlite3` | SQLite path |
+| `DOGFOOD_DEV_TOKENS` | off | Fixed session tokens for `.dogfood.toml` |
+| `DOGFOOD_DB` | `var/dogfood.sqlite3` | SQLite path (Docker: `/data/dogfood.sqlite3`) |
 | `PYTHONPATH` | — | Must include `src` for local runs |
+| `DOGFOOD_WEBHOOK_WORKER` | on in `serve` | Background HMAC delivery; off in pytest |
 
-Seeded logins (when `DOGFOOD_DEV_TOKENS=1`): organizer `org_7f2a`, judge_a `jdg_a_91bc`, judge_b `jdg_b_44de`, participant `prt_2e88` — as `Cookie: df_session=…` or `Authorization: Bearer …`.
+License: MIT. Leave with your data: [`docs/migration.md`](docs/migration.md).

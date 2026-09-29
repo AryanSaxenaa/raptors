@@ -3,7 +3,7 @@ base_url = "http://localhost:8080"
 
 [tiers]
 claimed = ["T1", "T2"]
-pitch = "Self-hostable judging portal: backend-enforced isolation, documented ridge normalization, honest T1/T2 claim."
+pitch = "The judging platform we would run: isolated ballots, weighted rubric, documented ridge calibration, quadratic votes, hash-chained audit."
 
 [auth]
 organizer = "Cookie: df_session=org_7f2a"

@@ -48,16 +48,17 @@
                            'peer_scores_denied', 'track_not_visible', 'aggregate_denied',
                            'audit_denied') %}
       <p class="sum">
-        You do not have access to that. <a href="/login">Sign in with a different account</a>
+        You do not have access to that. Isolation is enforced in the API, not the page.
+        <a href="/login">Sign in with a different account</a>
         if you expected to see it.
       </p>
     {% elif problem.code == 'submissions_closed' %}
       <p class="sum">
-        The submission window for this event has closed.
+        The submission window for this event has closed. The deadline actually holds.
       </p>
     {% elif problem.code == 'results_embargoed' %}
       <p class="sum">
-        Results stay private until the organizer publishes them.
+        Results stay hidden until the organizer publishes them.
       </p>
     {% endif %}
 

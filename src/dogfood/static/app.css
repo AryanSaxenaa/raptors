@@ -414,7 +414,7 @@ header.top .btn--nav-ghost:hover {
 }
 .hero__sub {
   margin: 0;
-  max-width: 42ch;
+  max-width: 48ch;
   text-align: left;
   font: 17px/1.5 var(--serif);
   color: var(--ink-dim);

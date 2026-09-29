@@ -20,11 +20,12 @@
     <p class="fs-eyebrow">GALLERY</p>
     <h1 class="gallery-head__title">Projects <span class="gallery-head__count">({{ total }})</span></h1>
     <p class="lede gallery-head__lede">
-      Browse submissions, filter by track, and leave comments.
       {% if who.is_anonymous %}
-        Sign in to spend community credits.
+        Every submitted project, searchable. Sign in to comment and spend quadratic credits.
       {% elif can_vote %}
-        Spend community credits from any project card.
+        Filter by track, leave comments, and spend quadratic credits from any card.
+      {% else %}
+        Browse the field. Vote totals stay private until results are published.
       {% endif %}
     </p>
   </header>
@@ -50,12 +51,12 @@
     </form>
   </div>
   <p class="fs-vote-intro__lede">
-    {{ credit_budget }} credits on <b>{{ vote_event.name }}</b>.
-    Influence is the square root of credits on a project, so stacking on one favourite buys less and less.
+    {{ credit_budget }} quadratic credits on <b>{{ vote_event.name }}</b>.
+    Influence is the square root of credits spent, so a loud minority cannot buy the outcome.
   </p>
   {% if who.is_anonymous %}
     <p class="fs-vote-signin-hint">
-      <a href="/login">Sign in</a> to spend credits on projects.
+      <a href="/login">Sign in</a> to spend your credits.
     </p>
   {% elif can_vote %}
     <div class="fs-credit-stats" aria-live="polite">
@@ -79,7 +80,7 @@
     {% if show_vote_tallies %}
       Vote totals are visible for this event.
     {% else %}
-      Vote totals stay private until the organizer publishes results.
+      Vote totals stay hidden until the organizer publishes results.
     {% endif %}
   </p>
 </section>

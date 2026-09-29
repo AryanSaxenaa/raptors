@@ -10,7 +10,7 @@
   <header class="workspace-head">
     <h1>Organizer console</h1>
     <p class="lede">
-      <b>{{ event.name }}</b> &middot; {{ progress.reviews_per_project }} reviews per project.
+      <b>{{ event.name }}</b> &middot; {{ progress.reviews_per_project }} reviews per project. Live coverage.
     </p>
   </header>
 </div>
@@ -205,7 +205,7 @@
     </tbody>
   </table>
   <p class="sum" style="margin-top:10px">
-    Weights are for this event. Saving a change refreshes the published results.
+    A weighted rubric, for this event. Saving a change refreshes calibrated ranks.
   </p>
 </div>
 
@@ -216,7 +216,7 @@
     <a href="/organizer/webhooks">Webhooks</a>
   </p>
   <p class="sum">
-    Download each stage as CSV, or the whole event as JSON.
+    Download each stage as CSV, or the whole event as JSON — the same data the API exposes.
   </p>
   <p>
     {% for stage in ['projects','teams','judges','assignments','scores','results','audit'] %}
