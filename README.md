@@ -1,5 +1,9 @@
 # Raptors
 
+<img width="1857" height="958" alt="Screenshot 2026-09-29 232353" src="https://github.com/user-attachments/assets/a308f620-1306-4daa-8651-98611069a9d2" />
+
+
+
 **The judging platform we would actually run** — isolated ballots, a weighted rubric, documented judge calibration, and a public gallery that still works with JavaScript off.
 
 Self-hosted. One Docker command. SQLite on disk. MIT. No cloud account, no hosted database, no auth vendor.
