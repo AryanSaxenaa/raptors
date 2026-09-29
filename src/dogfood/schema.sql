@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS events (
     submissions_close     TEXT,
     voting_opens_at       TEXT,
     voting_closes_at      TEXT,
+    -- authenticated | email | open. Enforced in community.py, not only in HTML.
+    voting_access         TEXT NOT NULL DEFAULT 'authenticated'
+                          CHECK (voting_access IN ('authenticated', 'email', 'open')),
     results_published     INTEGER NOT NULL DEFAULT 0 CHECK (results_published IN (0, 1)),
     reviews_per_project   INTEGER NOT NULL DEFAULT 3 CHECK (reviews_per_project > 0),
     -- Organizer-selectable. All three methods are always computed for export;
@@ -389,6 +392,8 @@ CREATE TABLE IF NOT EXISTS webhook_outbox (
     action       TEXT NOT NULL,
     payload      TEXT NOT NULL,
     created_at   TEXT NOT NULL,
+    attempts     INTEGER NOT NULL DEFAULT 0,
+    next_try_at  TEXT,
     processed_at TEXT
 );
 

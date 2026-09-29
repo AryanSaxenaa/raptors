@@ -192,7 +192,7 @@ def test_certificate_embargoed_until_publish(client):
     assert blocked.status_code == 403
     publish = client.patch(
         f"/api/events/{FIXTURE_EVENT}",
-        json={"results_published": True},
+        json={"voting_closes_at": "2020-01-01T00:00:00Z", "results_published": True},
         headers=auth(ORG_TOKEN),
     )
     assert publish.status_code == 200

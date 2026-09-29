@@ -41,7 +41,7 @@ from ..security import (
     judge_record,
     judge_track_ids,
 )
-from .community import VOTE_CREDIT_BUDGET
+from .community import VOTE_CREDIT_BUDGET, can_cast_vote, voting_access_of
 from .projects import gallery_rows, vote_tallies_visible
 
 router = APIRouter(include_in_schema=False)
@@ -342,11 +342,13 @@ def gallery(
                 "active": track == t["id"],
             }
         )
+    ctx = _base(request, conn, who)
+    ctx["can_vote"] = can_cast_vote(who, vote_row)
     return _templates(request).TemplateResponse(
         request,
         "gallery.html",
         {
-            **_base(request, conn, who),
+            **ctx,
             "projects": items,
             "total": total,
             "page": page,
@@ -364,6 +366,7 @@ def gallery(
             "track_nav": track_nav,
             "query_string": list_qs,
             "vote_event": dict(vote_row),
+            "voting_access": voting_access_of(vote_row),
             "credit_budget": VOTE_CREDIT_BUDGET,
             "show_vote_tallies": show_vote_tallies,
         },
@@ -449,11 +452,16 @@ def project_page(request: Request, conn: Conn, who: Who, project_id: str) -> Any
         (project_id,),
     )
     proj = dict(row)
+    event_row = query_one(conn, "SELECT * FROM events WHERE id = ?", (row["event_id"],))
+    ctx = _base(request, conn, who)
+    if event_row is not None:
+        ctx["can_vote"] = can_cast_vote(who, event_row)
+        ctx["voting_access"] = voting_access_of(event_row)
     return _templates(request).TemplateResponse(
         request,
         "project.html",
         {
-            **_base(request, conn, who),
+            **ctx,
             "project": proj,
             "tech_tags": json.loads(proj.get("tech_tags") or "[]"),
             "youtube_id": _youtube_id(proj.get("video_url")),

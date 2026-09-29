@@ -6,15 +6,17 @@ from __future__ import annotations
 import json
 import re
 import secrets
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr, Field
 
 from .. import audit, results
-from ..db import query, query_one, transaction, utcnow
+from ..db import query, query_one, require_iso_ts, transaction, utcnow
 from ..deps import Conn, Who, get_event
 from ..errors import ApiError
+from .community import VOTING_ACCESS_MODES
 from ..security import Capability, Operation, require_capability, require_operation
 from ..seed import DEV_PASSWORD, _upsert_user
 
@@ -23,6 +25,41 @@ router = APIRouter(prefix="/api", tags=["events"])
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "event"
+
+
+def _require_event_timestamps(**fields: str | None) -> None:
+    for field, value in fields.items():
+        require_iso_ts(value, field)
+
+
+def _require_voting_access(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if value not in VOTING_ACCESS_MODES:
+        raise ApiError(
+            "invalid_request",
+            f"voting_access must be one of {', '.join(VOTING_ACCESS_MODES)}",
+        )
+    return value
+
+
+def _refuse_publish_while_open(
+    event: Any, fields: dict[str, Any],
+) -> None:
+    if fields.get("results_published") is not True:
+        return
+    closes_raw = fields.get("voting_closes_at", event["voting_closes_at"])
+    closes = require_iso_ts(closes_raw, "voting_closes_at")
+    now = datetime.now(timezone.utc)
+    if closes is None or now < closes:
+        raise ApiError(
+            "invalid_request",
+            "cannot publish results before voting closes",
+            extra={
+                "voting_closes_at": closes_raw,
+                "now": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+        )
 
 
 class EventIn(BaseModel):
@@ -35,6 +72,7 @@ class EventIn(BaseModel):
     submissions_close: str | None = None
     voting_opens_at: str | None = None
     voting_closes_at: str | None = None
+    voting_access: str | None = None
     reviews_per_project: int = Field(default=3, ge=1, le=20)
 
 
@@ -46,6 +84,7 @@ class EventPatch(BaseModel):
     submissions_close: str | None = None
     voting_opens_at: str | None = None
     voting_closes_at: str | None = None
+    voting_access: str | None = None
     reviews_per_project: int | None = Field(default=None, ge=1, le=20)
     normalization_method: str | None = None
     exclude_duplicates: bool | None = None
@@ -116,6 +155,7 @@ def _event_payload(conn: Conn, event_id: str) -> dict[str, Any]:
         "submissions_close": row["submissions_close"],
         "voting_opens_at": row["voting_opens_at"],
         "voting_closes_at": row["voting_closes_at"],
+        "voting_access": row["voting_access"] if "voting_access" in row.keys() else "authenticated",
         "results_published": bool(row["results_published"]),
         "reviews_per_project": row["reviews_per_project"],
         "normalization_method": row["normalization_method"],
@@ -188,19 +228,28 @@ def read_event(conn: Conn, event_id: str) -> dict[str, Any]:
 @router.post("/events", status_code=201, summary="Create an event")
 def create_event(conn: Conn, who: Who, body: EventIn) -> dict[str, Any]:
     require_operation(conn, who, Operation.MANAGE_EVENT)
+    _require_event_timestamps(
+        starts_at=body.starts_at,
+        submissions_open_at=body.submissions_open_at,
+        submissions_close=body.submissions_close,
+        voting_opens_at=body.voting_opens_at,
+        voting_closes_at=body.voting_closes_at,
+    )
+    access = _require_voting_access(body.voting_access) or "authenticated"
     event_id = f"evt_{secrets.token_hex(4)}"
     with transaction(conn):
         conn.execute(
             """
             INSERT INTO events (id, name, slug, description, starts_at,
                                 submissions_open_at, submissions_close, voting_opens_at,
-                                voting_closes_at, reviews_per_project, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                voting_closes_at, voting_access, reviews_per_project, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id, body.name, f"{_slug(body.name)}-{event_id[-4:]}", body.description,
                 body.starts_at, body.submissions_open_at, body.submissions_close,
-                body.voting_opens_at, body.voting_closes_at, body.reviews_per_project, utcnow(),
+                body.voting_opens_at, body.voting_closes_at, access,
+                body.reviews_per_project, utcnow(),
             ),
         )
         # A new event with no rubric cannot be scored, so it gets the default
@@ -225,10 +274,23 @@ def create_event(conn: Conn, who: Who, body: EventIn) -> dict[str, Any]:
 @router.patch("/events/{event_id}", summary="Update event configuration")
 def patch_event(conn: Conn, who: Who, event_id: str, body: EventPatch) -> dict[str, Any]:
     require_operation(conn, who, Operation.MANAGE_EVENT, event_id=event_id)
-    get_event(conn, event_id)
+    event = get_event(conn, event_id)
     fields = body.model_dump(exclude_none=True)
     if not fields:
         raise ApiError("invalid_request", "no fields to update")
+    _require_event_timestamps(
+        **{
+            key: fields[key]
+            for key in (
+                "submissions_close",
+                "voting_opens_at",
+                "voting_closes_at",
+            )
+            if key in fields
+        }
+    )
+    if "voting_access" in fields:
+        fields["voting_access"] = _require_voting_access(fields["voting_access"])
     if "normalization_method" in fields:
         from ..normalize import METHODS
 
@@ -237,6 +299,7 @@ def patch_event(conn: Conn, who: Who, event_id: str, body: EventPatch) -> dict[s
                 "invalid_request",
                 f"normalization_method must be one of {', '.join(METHODS)}",
             )
+    _refuse_publish_while_open(event, fields)
     assignments = []
     params: list[Any] = []
     for key, value in fields.items():

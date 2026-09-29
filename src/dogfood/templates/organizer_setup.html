@@ -56,6 +56,14 @@
       <label for="vclose">Voting closes</label>
       <input id="vclose" value="{{ event.voting_closes_at or '' }}">
     </div>
+    <div class="setup-field">
+      <label for="vaccess">Who can vote</label>
+      <select id="vaccess">
+        <option value="authenticated" {% if event.voting_access == 'authenticated' %}selected{% endif %}>Signed-in participants and judges</option>
+        <option value="email" {% if event.voting_access == 'email' %}selected{% endif %}>Email-gated (no account)</option>
+        <option value="open" {% if event.voting_access == 'open' %}selected{% endif %}>Open link</option>
+      </select>
+    </div>
     <div class="setup-actions"><button id="save-event">Save event settings</button></div>
   </div>
 </div>
@@ -133,6 +141,7 @@ document.getElementById('save-event')?.addEventListener('click', async () => {
       results_published: document.getElementById('pub').checked,
       voting_opens_at: document.getElementById('vopen').value || null,
       voting_closes_at: document.getElementById('vclose').value || null,
+      voting_access: document.getElementById('vaccess').value,
     });
     flash('Event updated.', 'ok');
   } catch (e) { flash(e.message, 'bad'); }

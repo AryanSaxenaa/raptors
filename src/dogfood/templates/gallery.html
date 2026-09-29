@@ -6,7 +6,7 @@
 {% endblock %}
 
 {#
-  Server-rendered titles for acceptance greps. Default sort is arrival; page size 200.
+  Server-rendered titles for acceptance greps. Default sort is arrival; paginated (see GALLERY_PAGE_SIZE).
   Community vote controls sit on each card. Ballot shuffle stays on the API —
   this listing is never reordered to match a voter's ballot.
 #}
@@ -21,7 +21,11 @@
     <h1 class="gallery-head__title">Projects <span class="gallery-head__count">({{ total }})</span></h1>
     <p class="lede gallery-head__lede">
       {% if who.is_anonymous %}
+        {% if voting_access == 'authenticated' %}
         Every submitted project, searchable. Sign in to comment and spend quadratic credits.
+        {% else %}
+        Every submitted project, searchable. Spend quadratic credits{% if voting_access == 'email' %} with your email{% endif %} from any card.
+        {% endif %}
       {% elif can_vote %}
         Filter by track, leave comments, and spend quadratic credits from any card.
       {% else %}
@@ -54,7 +58,12 @@
     {{ credit_budget }} quadratic credits on <b>{{ vote_event.name }}</b>.
     Influence is the square root of credits spent, so a loud minority cannot buy the outcome.
   </p>
-  {% if who.is_anonymous %}
+  {% if voting_access == 'email' and who.is_anonymous %}
+    <p class="fs-vote-signin-hint">
+      <label for="vote-email">Email for this ballot</label>
+      <input id="vote-email" type="email" required placeholder="you@example.com" autocomplete="email">
+    </p>
+  {% elif who.is_anonymous and voting_access == 'authenticated' %}
     <p class="fs-vote-signin-hint">
       <a href="/login">Sign in</a> to spend your credits.
     </p>
@@ -191,11 +200,7 @@
               {% endif %}
             </footer>
             {% if p.event_id == vote_event.id and not p.is_duplicate %}
-              {% if who.is_anonymous %}
-                <div class="gallery-card__vote gallery-card__vote--locked">
-                  <a class="btn ghost" href="/login">Sign in to vote</a>
-                </div>
-              {% elif can_vote %}
+              {% if can_vote %}
               <div class="gallery-card__vote fs-vote-stepper">
                 <span class="gallery-card__spent dim" data-spent="{{ p.id }}">Your credits: 0</span>
                 <div class="fs-stepper-row">
@@ -209,6 +214,10 @@
                   <button type="button" class="fs-vote-btn" data-vote="{{ p.id }}">Cast vote</button>
                 </div>
               </div>
+              {% elif who.is_anonymous %}
+                <div class="gallery-card__vote gallery-card__vote--locked">
+                  <a class="btn ghost" href="/login">Sign in to vote</a>
+                </div>
               {% endif %}
             {% endif %}
           </article>
@@ -222,10 +231,15 @@
 {% endblock %}
 
 {% block scripts %}
-{% if can_vote and not who.is_anonymous %}
+{% if can_vote %}
 <script>
 const eventId = {{ vote_event.id | tojson }};
 const creditBudget = {{ credit_budget | tojson }};
+
+function voteEmail() {
+  const el = document.getElementById('vote-email');
+  return el && el.value ? el.value.trim() : null;
+}
 
 function spentLabel(root, projectId, credits) {
   const el = root.querySelector('[data-spent="' + projectId + '"]');
@@ -240,7 +254,9 @@ function updateCreditStrip(spent, budget) {
 }
 
 async function loadBallot() {
-  const ballot = await api('GET', '/api/events/' + eventId + '/ballot');
+  const email = voteEmail();
+  const qs = email ? ('?email=' + encodeURIComponent(email)) : '';
+  const ballot = await api('GET', '/api/events/' + eventId + '/ballot' + qs);
   const budget = document.getElementById('budget');
   if (budget) {
     budget.textContent =
@@ -285,6 +301,7 @@ document.querySelectorAll('[data-vote]').forEach(function (btn) {
       await api('POST', '/api/events/' + eventId + '/votes', {
         project_id: projectId,
         credits: credits,
+        email: voteEmail(),
       });
       flash('Vote recorded.', 'ok');
       await loadBallot();
@@ -296,7 +313,13 @@ document.querySelectorAll('[data-vote]').forEach(function (btn) {
   });
 });
 
-loadBallot().catch(function (e) { flash(e.message, 'bad'); });
+loadBallot().catch(function (e) {
+  if (document.getElementById('vote-email') && !voteEmail()) return;
+  flash(e.message, 'bad');
+});
+document.getElementById('vote-email')?.addEventListener('change', function () {
+  loadBallot().catch(function (e) { flash(e.message, 'bad'); });
+});
 </script>
 {% endif %}
 {% endblock %}

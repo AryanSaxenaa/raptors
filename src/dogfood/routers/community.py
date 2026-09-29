@@ -44,6 +44,7 @@ from ..security import (
     Operation,
     deny,
     has_capability,
+    has_operation,
     require_operation,
 )
 
@@ -66,6 +67,27 @@ class VoteIn(BaseModel):
     email: str | None = Field(default=None, max_length=320)
 
 
+VOTING_ACCESS_MODES = ("authenticated", "email", "open")
+
+
+def voting_access_of(event: sqlite3.Row) -> str:
+    try:
+        value = event["voting_access"]
+    except (KeyError, IndexError):
+        value = "authenticated"
+    if value in VOTING_ACCESS_MODES:
+        return str(value)
+    return "authenticated"
+
+
+def can_cast_vote(who: Identity, event: sqlite3.Row) -> bool:
+    """Whether this identity may spend credits on this event's configured mode."""
+    access = voting_access_of(event)
+    if access in ("open", "email"):
+        return True
+    return has_operation(who.role, Operation.VOTE)
+
+
 def _voter_key(
     request: Request, who: Identity, event: sqlite3.Row, email: str | None
 ) -> tuple[str, str]:
@@ -75,15 +97,28 @@ def _voter_key(
     recorded on every ballot so an organizer can weigh them differently after
     the fact instead of discovering the mode was never captured.
     """
+    access = voting_access_of(event)
     if not who.is_anonymous:
         return f"user:{who.user_id}", "authenticated"
-    if email:
-        digest = hashlib.sha256(f"{event['id']}:{email.lower()}".encode()).hexdigest()[:32]
+    if access == "email":
+        if not email or not str(email).strip():
+            raise ApiError("invalid_request", "email is required for email-gated voting")
+        digest = hashlib.sha256(
+            f"{event['id']}:{str(email).strip().lower()}".encode()
+        ).hexdigest()[:32]
         return f"email:{digest}", "email"
-    return f"open:{client_fingerprint(request)}", "open"
+    if access == "open":
+        return f"open:{client_fingerprint(request)}", "open"
+    raise ApiError("role_required", "this event requires an authenticated voter")
 
 
-def _voting_open(conn: sqlite3.Connection, event: sqlite3.Row, who: Identity) -> None:
+def require_voting_window(conn: sqlite3.Connection, event: sqlite3.Row, who: Identity) -> None:
+    if event["results_published"]:
+        raise deny(
+            conn, who, "voting_closed",
+            detail="voting is closed because results have been published",
+            event_id=event["id"],
+        )
     now = datetime.now(timezone.utc)
     opens = parse_ts(event["voting_opens_at"])
     closes = parse_ts(event["voting_closes_at"])
@@ -99,6 +134,23 @@ def _voting_open(conn: sqlite3.Connection, event: sqlite3.Row, who: Identity) ->
             detail=f"voting closed at {event['voting_closes_at']}",
             event_id=event["id"],
         )
+
+
+def require_vote_access(
+    conn: sqlite3.Connection,
+    who: Identity,
+    event: sqlite3.Row,
+    email: str | None,
+) -> None:
+    access = voting_access_of(event)
+    if access == "authenticated":
+        require_operation(conn, who, Operation.VOTE, event_id=event["id"])
+        return
+    if access == "email":
+        if who.is_anonymous and not (email and str(email).strip()):
+            raise ApiError("invalid_request", "email is required for email-gated voting")
+        return
+    # open: anyone with the link.
 
 
 @router.get("/projects/{project_id}/comments", summary="Read comments on a project")
@@ -148,8 +200,9 @@ def get_ballot(
     request: Request, conn: Conn, who: Who, event_id: str,
     email: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    require_operation(conn, who, Operation.VOTE)
     event = get_event(conn, event_id)
+    require_voting_window(conn, event, who)
+    require_vote_access(conn, who, event, email)
     key, mode = _voter_key(request, who, event, email)
 
     rows = query(
@@ -198,9 +251,9 @@ def get_ballot(
 def post_vote(
     request: Request, conn: Conn, who: Who, event_id: str, body: VoteIn
 ) -> dict[str, Any]:
-    require_operation(conn, who, Operation.VOTE)
     event = get_event(conn, event_id)
-    _voting_open(conn, event, who)
+    require_voting_window(conn, event, who)
+    require_vote_access(conn, who, event, body.email)
 
     project = query_one(
         conn,

@@ -2,9 +2,9 @@
 
 ## Leave with your data
 
-1. As organizer, `GET /api/exports/event.json` — full snapshot (events, teams, projects, judges, scores).
+1. As organizer, `GET /api/exports/event.json` — snapshot of the event, teams, projects (including images and custom answers), judges, scores, prizes, custom questions, assignments, votes, and webhook URLs (secrets are not exported; import mints new ones).
 2. Download stage CSVs from `/api/exports/{projects,teams,judges,assignments,scores,results,audit}.csv` if downstream tools need spreadsheets.
-3. Copy the SQLite file (`DOGFOOD_DB`) for a byte-identical backup including audit chain and sessions.
+3. Copy the SQLite file (`DOGFOOD_DB`) for a byte-identical backup including audit chain and sessions. Audit rows are not in the JSON snapshot because the hash chain is append-only on the origin database.
 
 ## Arrive on a new host
 

@@ -30,6 +30,9 @@ def parse_ts(value: str | None) -> datetime | None:
     Always returns an aware datetime in UTC, so callers can compare against
     datetime.now(timezone.utc) without thinking about it. Naive input is
     treated as UTC, which is what both fixtures.json and this schema store.
+    Empty input is "no deadline". Invalid input is also None so *read* paths
+    stay total; write paths must call require_iso_ts so garbage cannot disable
+    a deadline by accident.
     """
     if not value:
         return None
@@ -41,6 +44,18 @@ def parse_ts(value: str | None) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def require_iso_ts(value: str | None, field: str) -> datetime | None:
+    """Reject unparseable timestamps on write so they cannot mean 'open forever'."""
+    from .errors import ApiError
+
+    if value is None or not str(value).strip():
+        return None
+    parsed = parse_ts(value)
+    if parsed is None:
+        raise ApiError("invalid_request", f"{field} is not a valid ISO-8601 timestamp")
+    return parsed
 
 
 def connect(path: Path | None = None) -> sqlite3.Connection:
@@ -58,8 +73,33 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     return conn
 
 
+def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def apply_migrations(conn: sqlite3.Connection) -> None:
+    """Additive alters for databases created before SCHEMA_VERSION 2.
+
+    CREATE TABLE IF NOT EXISTS will not add columns to an existing table.
+    """
+    event_cols = _table_columns(conn, "events")
+    if "voting_access" not in event_cols:
+        conn.execute(
+            "ALTER TABLE events ADD COLUMN voting_access TEXT NOT NULL "
+            "DEFAULT 'authenticated'"
+        )
+    outbox_cols = _table_columns(conn, "webhook_outbox")
+    if "attempts" not in outbox_cols:
+        conn.execute(
+            "ALTER TABLE webhook_outbox ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0"
+        )
+    if "next_try_at" not in outbox_cols:
+        conn.execute("ALTER TABLE webhook_outbox ADD COLUMN next_try_at TEXT")
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    apply_migrations(conn)
     conn.execute(
         "INSERT INTO schema_meta (key, value) VALUES ('version', ?) "
         "ON CONFLICT (key) DO UPDATE SET value = excluded.value",

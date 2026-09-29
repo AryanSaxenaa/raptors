@@ -13,6 +13,7 @@ import secrets
 import sqlite3
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ from .db import connect, query, transaction, utcnow
 
 DEFAULT_TIMEOUT = 2.0
 BATCH_SIZE = 10
+MAX_ATTEMPTS = 5
 
 
 def sign_body(secret: str, raw: bytes) -> str:
@@ -115,15 +117,26 @@ def _deliver_one(
     return bool(success), status_code, error
 
 
+def _next_try_at(attempts: int) -> str:
+    delay = min(2 ** max(attempts, 1), 300)
+    return (datetime.now(timezone.utc) + timedelta(seconds=delay)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+
 def process_outbox_batch(conn: sqlite3.Connection, *, limit: int = BATCH_SIZE) -> int:
-    """Deliver pending outbox rows. Returns count processed."""
+    """Deliver pending outbox rows. Returns count processed (success or given-up)."""
+    now = utcnow()
     pending = query(
         conn,
         """
-        SELECT id, event_id, action, payload FROM webhook_outbox
-         WHERE processed_at IS NULL ORDER BY created_at ASC LIMIT ?
+        SELECT id, event_id, action, payload, attempts FROM webhook_outbox
+         WHERE processed_at IS NULL
+           AND (next_try_at IS NULL OR next_try_at <= ?)
+           AND attempts < ?
+         ORDER BY created_at ASC LIMIT ?
         """,
-        (limit,),
+        (now, MAX_ATTEMPTS, limit),
     )
     if not pending:
         return 0
@@ -136,12 +149,15 @@ def process_outbox_batch(conn: sqlite3.Connection, *, limit: int = BATCH_SIZE) -
         payload = json.loads(row["payload"] or "{}")
         action = row["action"]
         event_id = row["event_id"]
+        failed = False
+        matched = False
         for hook in hooks:
             if hook["event_id"] is not None and hook["event_id"] != event_id:
                 continue
             if not _matches(hook["actions"], action):
                 continue
-            _deliver_one(
+            matched = True
+            success, _, _ = _deliver_one(
                 conn,
                 webhook_id=hook["id"],
                 url=hook["url"],
@@ -150,9 +166,33 @@ def process_outbox_batch(conn: sqlite3.Connection, *, limit: int = BATCH_SIZE) -
                 event_id=event_id,
                 payload=payload,
             )
+            if not success:
+                failed = True
+        attempts = int(row["attempts"] or 0)
+        if not matched:
+            conn.execute(
+                "UPDATE webhook_outbox SET processed_at = ? WHERE id = ?",
+                (now, row["id"]),
+            )
+            processed += 1
+            continue
+        if failed:
+            attempts += 1
+            if attempts >= MAX_ATTEMPTS:
+                conn.execute(
+                    "UPDATE webhook_outbox SET attempts = ?, processed_at = ? WHERE id = ?",
+                    (attempts, now, row["id"]),
+                )
+                processed += 1
+            else:
+                conn.execute(
+                    "UPDATE webhook_outbox SET attempts = ?, next_try_at = ? WHERE id = ?",
+                    (attempts, _next_try_at(attempts), row["id"]),
+                )
+            continue
         conn.execute(
-            "UPDATE webhook_outbox SET processed_at = ? WHERE id = ?",
-            (utcnow(), row["id"]),
+            "UPDATE webhook_outbox SET processed_at = ?, attempts = ? WHERE id = ?",
+            (now, attempts, row["id"]),
         )
         processed += 1
     return processed

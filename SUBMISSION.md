@@ -72,16 +72,16 @@ Plus the documents the website lists:
 
 ### T3 Public — shipped, not claimed
 
-- Community voting with quadratic credits (influence = √credits). Identity recorded as `authenticated` / `email` / `open` on each ballot. The HTML gallery requires sign-in to spend credits; the API still accepts email or open-link keys. Organizers who need a single forced mode should require auth (named in `THREAT-MODEL.md`).
+- Community voting with quadratic credits (influence = √credits). Per-event `voting_access`: authenticated, email-gated, or open-link — enforced on ballot and vote APIs; gallery UI supports email/open (`/organizer/setup`).
 - Comments on gallery projects.
-- Results hidden from everyone but organizers until `results_published`.
-- Randomised ballot order, seeded per voter (`GET /api/events/{id}/ballot`).
-- Anti-abuse: rate limits, duplicate detection (`prj_41`), hash-chained audit an organizer reads at `/organizer/audit`.
+- Results hidden until publish; **publish refused until `voting_closes_at`**; votes and ballot blocked after publish.
+- Randomised ballot order, seeded per voter (`GET /api/events/{id}/ballot`); same voting-window guards as POST.
+- Anti-abuse: rate limits, duplicate detection (`prj_41`), hash-chained audit. Covered in `tests/test_integrity_gates.py`.
 
 ### T4 Stretch — shipped, not claimed
 
 - REST API covering UI writes; OpenAPI at `/docs` and `docs/openapi.json` (CI diffs them).
-- Webhooks, HMAC-SHA256, outbox so delivery cannot block a write.
+- Webhooks, HMAC-SHA256, outbox with retries so delivery cannot block a write.
 - Certificate and record generation (project certificate after publish; judge participation record).
 - Signed, publicly verifiable records: `GET /api/records/{hash}`, `POST /api/records/verify`. Hash-anchored JSON, not X.509.
 - Embeddable gallery widget.
@@ -115,11 +115,10 @@ Plus the documents the website lists:
 ## Honest gaps (not bugs)
 
 1. Setup HTML does not create prizes, custom questions, or rubric rows. The API does.
-2. Voting HTML is authenticated. Open/email modes exist on the API and are stored on the ballot.
-3. No pairwise judging.
-4. Records are not CA-signed.
-5. Docker demo leaves `DOGFOOD_DEV_TOKENS=1` so `run.py` works. Production: `0`.
-6. Demo video still to record.
+2. No pairwise judging.
+3. Records are not CA-signed.
+4. Docker demo leaves `DOGFOOD_DEV_TOKENS=1` so `run.py` works. Production default is `0`.
+5. Demo video still to record (outline: `docs/demo-video-outline.md`).
 
 ---
 

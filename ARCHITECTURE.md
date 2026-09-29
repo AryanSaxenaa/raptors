@@ -48,7 +48,7 @@ SQLite at `DOGFOOD_DB` (default `var/dogfood.sqlite3`; Docker uses `/data` on a 
 
 ## Webhooks
 
-Audit `record()` only inserts an **outbox** row in the same transaction. A daemon thread (`DOGFOOD_WEBHOOK_WORKER`, default on in `serve`, off in pytest) POSTs HMAC-SHA256 signed bodies. A dead endpoint cannot stall a ballot save. See `src/dogfood/webhooks.py`.
+Audit `record()` only inserts an **outbox** row in the same transaction. A daemon thread (`DOGFOOD_WEBHOOK_WORKER`, default on in `serve`, off in pytest) POSTs HMAC-SHA256 signed bodies with exponential backoff retries. A dead endpoint cannot stall a ballot save. See `src/dogfood/webhooks.py`.
 
 ## Processes and deploy
 

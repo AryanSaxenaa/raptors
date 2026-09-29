@@ -346,15 +346,71 @@ def export_event_json(conn: sqlite3.Connection, event_id: str) -> dict[str, Any]
     ):
         criteria.setdefault(row["score_id"], {})[row["criterion_key"]] = int(row["value"])
 
+    images: dict[str, list[str]] = {}
+    for row in query(
+        conn,
+        "SELECT pi.project_id, pi.url FROM project_images pi "
+        "JOIN projects p ON p.id = pi.project_id WHERE p.event_id = ? ORDER BY pi.sort",
+        (event_id,),
+    ):
+        images.setdefault(row["project_id"], []).append(row["url"])
+
+    answers: dict[str, dict[str, str]] = {}
+    for row in query(
+        conn,
+        "SELECT pa.project_id, pa.question_id, pa.answer FROM project_answers pa "
+        "JOIN projects p ON p.id = pa.project_id WHERE p.event_id = ?",
+        (event_id,),
+    ):
+        answers.setdefault(row["project_id"], {})[row["question_id"]] = row["answer"]
+
     return {
         "exported_at": utcnow(),
         "event": {
             "id": event["id"],
             "name": event["name"],
+            "description": event["description"],
             "submissions_close": event["submissions_close"],
+            "voting_opens_at": event["voting_opens_at"],
+            "voting_closes_at": event["voting_closes_at"],
+            "voting_access": event["voting_access"]
+            if "voting_access" in event.keys()
+            else "authenticated",
+            "results_published": bool(event["results_published"]),
             "normalization_method": event["normalization_method"],
             "reviews_per_project": event["reviews_per_project"],
+            "exclude_duplicates": bool(event["exclude_duplicates"]),
         },
+        "prizes": [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "description": r["description"],
+                "amount_cents": r["amount_cents"],
+                "currency": r["currency"],
+            }
+            for r in query(
+                conn,
+                "SELECT id, name, description, amount_cents, currency FROM prizes "
+                "WHERE event_id = ? ORDER BY sort",
+                (event_id,),
+            )
+        ],
+        "custom_questions": [
+            {
+                "id": r["id"],
+                "prompt": r["prompt"],
+                "kind": r["kind"],
+                "options": json.loads(r["options"] or "[]"),
+                "required": bool(r["required"]),
+            }
+            for r in query(
+                conn,
+                "SELECT id, prompt, kind, options, required FROM custom_questions "
+                "WHERE event_id = ? ORDER BY sort",
+                (event_id,),
+            )
+        ],
         "rubric": [
             {"key": r["key"], "label": r["label"], "weight": r["weight"]}
             for r in query(
@@ -393,8 +449,54 @@ def export_event_json(conn: sqlite3.Connection, event_id: str) -> dict[str, Any]
                 "status": r["status"],
                 "submitted_at": r["submitted_at"],
                 "duplicate_of": r["duplicate_of"],
+                "images": images.get(r["id"], []),
+                "custom_answers": answers.get(r["id"], {}),
             }
             for r in projects
+        ],
+        "assignments": [
+            {
+                "id": r["id"],
+                "judge": r["judge_id"],
+                "project": r["project_id"],
+                "status": r["status"],
+                "batch": r["batch"],
+            }
+            for r in query(
+                conn,
+                "SELECT id, judge_id, project_id, status, batch FROM assignments "
+                "WHERE event_id = ? ORDER BY id",
+                (event_id,),
+            )
+        ],
+        "votes": [
+            {
+                "id": r["id"],
+                "project": r["project_id"],
+                "voter_key": r["voter_key"],
+                "voter_mode": r["voter_mode"],
+                "credits": r["credits"],
+            }
+            for r in query(
+                conn,
+                "SELECT id, project_id, voter_key, voter_mode, credits FROM votes "
+                "WHERE event_id = ? ORDER BY id",
+                (event_id,),
+            )
+        ],
+        "webhooks": [
+            {
+                "id": r["id"],
+                "url": r["url"],
+                "actions": json.loads(r["actions"] or "[]"),
+                "active": bool(r["active"]),
+            }
+            for r in query(
+                conn,
+                "SELECT id, url, actions, active FROM webhooks "
+                "WHERE event_id IS NULL OR event_id = ? ORDER BY id",
+                (event_id,),
+            )
         ],
         "scores": [
             {

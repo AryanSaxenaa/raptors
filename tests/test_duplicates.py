@@ -19,5 +19,6 @@ def test_fixture_duplicate_is_flagged(seeded_conn):
 
 
 def test_duplicate_still_listed_in_gallery(client):
-    body = client.get("/projects").text
+    """Duplicates stay in the public gallery; pagination may put them off page 1."""
+    body = client.get("/projects?q=Dry+Harbour").text
     assert "Dry Harbour" in body

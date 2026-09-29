@@ -207,11 +207,14 @@ def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) ->
         except Exception as exc:  # noqa: BLE001 - health must answer, not raise
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
         ready = projects_n > 0 and judges_n > 0
+        schema_ok = bool(version) and version["value"] == SCHEMA_VERSION
+        ready = ready and schema_ok
         return JSONResponse(
             {
                 "ok": ready,
                 "schema_version": version["value"] if version else None,
                 "expected_schema_version": SCHEMA_VERSION,
+                "schema_ok": schema_ok,
                 "counts": {
                     "projects": projects_n,
                     "judges": judges_n,

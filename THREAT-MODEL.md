@@ -20,7 +20,9 @@ Scope: a **self-hosted** hackathon portal run by an organizer who controls the s
 | CSRF on JSON writes | Opaque credential; optional `DOGFOOD_STRICT_ORIGIN` | config |
 | Webhook blocking writes | Outbox + background worker | `tests/test_webhooks_and_ui.py` |
 | XSS on voting UI | DOM `textContent`, no `innerHTML` | vote template test |
-| Deadline gaming via clock | Compare stored UTC close to server now; no client clock | `parse_ts` |
+| Deadline gaming via clock | Compare stored UTC close to server now; invalid timestamps rejected on write | `require_iso_ts` |
+| Publish during voting | `results_published` blocked until `voting_closes_at` | `events.patch_event` |
+| Cross-event track on edit | PATCH validates `track_id` belongs to project event | `projects.update_project` |
 | Duplicate submission (same team + title) | Flag, keep, exclude from rank | `prj_41` |
 
 ## Voting modes

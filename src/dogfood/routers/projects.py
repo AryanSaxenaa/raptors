@@ -20,6 +20,7 @@ body runs and that would put validation ahead of the guard.
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any
@@ -61,6 +62,17 @@ class ProjectIn(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
     custom_answers: dict[str, str] = Field(default_factory=dict)
     submit: bool = False
+
+
+def _require_track_on_event(
+    conn: sqlite3.Connection, event_id: str, track_id: str | None
+) -> None:
+    if not track_id:
+        return
+    if query_one(
+        conn, "SELECT 1 FROM tracks WHERE id = ? AND event_id = ?", (track_id, event_id)
+    ) is None:
+        raise ApiError("invalid_request", f"no track '{track_id}' on this event")
 
 
 def _validate_urls(payload: ProjectIn) -> None:
@@ -166,13 +178,11 @@ async def create_project(
             event_id=event_id,
         )
 
-    if payload.track and query_one(
-        conn, "SELECT 1 FROM tracks WHERE id = ? AND event_id = ?", (payload.track, event_id)
-    ) is None:
-        raise ApiError("invalid_request", f"no track '{payload.track}' on this event")
+    if payload.track:
+        _require_track_on_event(conn, event_id, payload.track)
 
     now = utcnow()
-    project_id = f"prj_{event_id}_{team['id']}_{int(datetime.now(timezone.utc).timestamp())}"
+    project_id = f"prj_{event_id}_{team['id']}_{secrets.token_hex(4)}"
     status = "submitted" if payload.submit else "draft"
 
     with transaction(conn):
@@ -193,7 +203,9 @@ async def create_project(
             ),
         )
         _write_images(conn, project_id, payload.images)
-        _write_answers(conn, event_id, project_id, payload.custom_answers)
+        _write_answers(
+            conn, event_id, project_id, payload.custom_answers, submitting=payload.submit
+        )
         audit.record(
             conn,
             "project.created",
@@ -256,6 +268,7 @@ async def update_project(
     merged.update({k: v for k, v in raw.items() if k in ProjectIn.model_fields})
     payload = _parse_body(merged)
     _validate_urls(payload)
+    _require_track_on_event(conn, event["id"], payload.track)
 
     now = utcnow()
     submit_now = bool(raw.get("submit")) or project["status"] != "draft"
@@ -282,8 +295,14 @@ async def update_project(
         )
         if payload.images:
             _write_images(conn, project_id, payload.images)
-        if payload.custom_answers:
-            _write_answers(conn, event["id"], project_id, payload.custom_answers)
+        if payload.custom_answers or submit_now:
+            _write_answers(
+                conn,
+                event["id"],
+                project_id,
+                payload.custom_answers,
+                submitting=submit_now,
+            )
         audit.record(
             conn,
             "project.updated",
@@ -306,21 +325,75 @@ def _write_images(conn: sqlite3.Connection, project_id: str, urls: list[str]) ->
         )
 
 
+def _validate_one_answer(question: sqlite3.Row, answer: str) -> None:
+    kind = question["kind"]
+    text = answer if isinstance(answer, str) else str(answer)
+    if len(text) > 4000:
+        raise ApiError("invalid_request", f"answer to '{question['id']}' exceeds 4000 characters")
+    if not text.strip():
+        return
+    if kind == "url" and not text.startswith(("http://", "https://")):
+        raise ApiError("invalid_request", f"answer to '{question['id']}' must be an http or https url")
+    if kind == "boolean" and text.strip().lower() not in {
+        "true", "false", "0", "1", "yes", "no",
+    }:
+        raise ApiError(
+            "invalid_request",
+            f"answer to '{question['id']}' must be a boolean (true/false)",
+        )
+    if kind == "select":
+        options = json.loads(question["options"] or "[]")
+        if options and text not in options:
+            raise ApiError(
+                "invalid_request",
+                f"answer to '{question['id']}' must be one of the listed options",
+            )
+
+
 def _write_answers(
-    conn: sqlite3.Connection, event_id: str, project_id: str, answers: dict[str, str]
+    conn: sqlite3.Connection,
+    event_id: str,
+    project_id: str,
+    answers: dict[str, str],
+    *,
+    submitting: bool,
 ) -> None:
-    valid = {
-        row["id"]
-        for row in query(conn, "SELECT id FROM custom_questions WHERE event_id = ?", (event_id,))
-    }
-    unknown = sorted(set(answers) - valid)
+    questions = query(
+        conn, "SELECT id, kind, options, required FROM custom_questions WHERE event_id = ?",
+        (event_id,),
+    )
+    by_id = {row["id"]: row for row in questions}
+    unknown = sorted(set(answers) - set(by_id))
     if unknown:
         raise ApiError("invalid_request", f"unknown custom question ids: {', '.join(unknown)}")
+    stored = {
+        row["question_id"]: row["answer"]
+        for row in query(
+            conn,
+            "SELECT question_id, answer FROM project_answers WHERE project_id = ?",
+            (project_id,),
+        )
+    }
+    merged = {**stored, **answers}
+    if submitting:
+        missing = [
+            row["id"]
+            for row in questions
+            if row["required"] and not str(merged.get(row["id"], "")).strip()
+        ]
+        if missing:
+            raise ApiError(
+                "invalid_request",
+                "required custom questions are unanswered",
+                extra={"question_ids": missing},
+            )
     for question_id, answer in answers.items():
+        text = answer if isinstance(answer, str) else str(answer)
+        _validate_one_answer(by_id[question_id], text)
         conn.execute(
             "INSERT INTO project_answers (project_id, question_id, answer) VALUES (?, ?, ?) "
             "ON CONFLICT (project_id, question_id) DO UPDATE SET answer = excluded.answer",
-            (project_id, question_id, answer),
+            (project_id, question_id, text),
         )
 
 

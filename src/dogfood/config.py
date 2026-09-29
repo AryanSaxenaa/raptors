@@ -76,7 +76,7 @@ def load_settings() -> Settings:
         host=host,
         port=port,
         base_url=os.environ.get("DOGFOOD_BASE_URL", f"http://localhost:{port}"),
-        dev_tokens=_env_bool("DOGFOOD_DEV_TOKENS", True),
+        dev_tokens=_env_bool("DOGFOOD_DEV_TOKENS", False),
         strict_origin=_env_bool("DOGFOOD_STRICT_ORIGIN", False),
         templates_dir=PACKAGE_DIR / "templates",
         static_dir=PACKAGE_DIR / "static",
@@ -91,4 +91,4 @@ GALLERY_PAGE_SIZE = 18
 # Long HTML tables (judge queue, audit, results leaderboard).
 TABLE_PAGE_SIZE = 20
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"

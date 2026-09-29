@@ -24,7 +24,7 @@ A judge is a **user** plus a per-event `judges` row. The role matrix has one sub
 
 | Table | Role |
 | --- | --- |
-| `events` | Deadlines, voting window, `results_published`, `reviews_per_project`, `normalization_method`, `exclude_duplicates`, `rubric_version`. |
+| `events` | Deadlines, voting window, `voting_access` (`authenticated` \| `email` \| `open`), `results_published`, `reviews_per_project`, `normalization_method`, `exclude_duplicates`, `rubric_version`. |
 | `tracks` | UNIQUE `(event_id, name)`. |
 | `prizes` | Optional `amount_cents` / currency. |
 | `rubric_criteria` | Weighted keys; replacing the set increments `rubric_version`. |
@@ -71,7 +71,7 @@ Solo teams (13 in the fixture) have no minimum-member constraint.
 | `votes` | UNIQUE `(event_id, project_id, voter_key)`; `credits` for quadratic influence. |
 | `rate_limits` | Sliding windows for comments and votes. |
 | `audit_log` | Append-only, `prev_hash` / `entry_hash`. No UPDATE/DELETE in application code. |
-| `webhooks`, `webhook_deliveries`, `webhook_outbox` | Signed POSTs; outbox so audit writes never block on HTTP. |
+| `webhooks`, `webhook_deliveries`, `webhook_outbox` | Signed POSTs; outbox with `attempts` / `next_try_at` retries so audit writes never block on HTTP. |
 | `issued_records` | Persisted judge records and project certificates, keyed by `record_hash`. |
 
 Indexes exist on every foreign-key lookup used by the gallery, judge queue, and audit filters (`projects_gallery_idx`, `audit_action_idx`, …).
@@ -83,7 +83,7 @@ An organizer can leave. That is a requirement of Adoptability (20%), not a court
 | Direction | Format | Route |
 | --- | --- | --- |
 | Out | RFC 4180 CSV, CRLF, no BOM | `GET /api/exports/{projects,teams,judges,assignments,scores,results,audit}.csv` |
-| Out | Full event JSON | `GET /api/exports/event.json` |
+| Out | Event JSON (config, projects with images/answers, assignments, votes, webhooks) | `GET /api/exports/event.json` |
 | In | Same JSON snapshot (or `fixtures.json` unchanged) | `POST /api/imports/event.json` |
 | Out | Byte-identical backup | copy `DOGFOOD_DB` |
 

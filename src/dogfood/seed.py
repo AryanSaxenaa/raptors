@@ -238,25 +238,35 @@ def seed(
     event = fixtures["event"]
     event_id = event["id"]
 
+    voting_access = event.get("voting_access") or "authenticated"
+    if voting_access not in ("authenticated", "email", "open"):
+        voting_access = "authenticated"
     conn.execute(
         """
         INSERT INTO events (id, name, slug, description, submissions_close,
-                            voting_opens_at, voting_closes_at,
+                            voting_opens_at, voting_closes_at, voting_access,
                             reviews_per_project, is_fixture, created_at)
-        VALUES (?, ?, ?, ?, ?, '2020-01-01T00:00:00Z', '2099-01-01T00:00:00Z', 3, 1, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 3, 1, ?)
         ON CONFLICT (id) DO UPDATE SET
             name = excluded.name,
             submissions_close = excluded.submissions_close,
             voting_opens_at = excluded.voting_opens_at,
-            voting_closes_at = excluded.voting_closes_at
+            voting_closes_at = excluded.voting_closes_at,
+            voting_access = excluded.voting_access
         """,
         (
             event_id,
             event["name"],
             _slug(event["name"]),
-            "Fixture event published with the DOGFOOD 2026 spec. "
-            "Submissions closed at the fixture deadline.",
+            event.get("description")
+            or (
+                "Fixture event published with the DOGFOOD 2026 spec. "
+                "Submissions closed at the fixture deadline."
+            ),
             event.get("submissions_close"),
+            event.get("voting_opens_at") or "2020-01-01T00:00:00Z",
+            event.get("voting_closes_at") or "2099-01-01T00:00:00Z",
+            voting_access,
             now,
         ),
     )
@@ -271,6 +281,48 @@ def seed(
             ON CONFLICT (id) DO UPDATE SET name = excluded.name
             """,
             (f"prz_{event_id}_{index + 1}", event_id, prize[0], prize[1], index),
+        )
+
+    for prize in fixtures.get("prizes") or []:
+        conn.execute(
+            """
+            INSERT INTO prizes (id, event_id, name, description, amount_cents, currency, sort)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+            ON CONFLICT (id) DO UPDATE SET
+                name = excluded.name,
+                description = excluded.description,
+                amount_cents = excluded.amount_cents,
+                currency = excluded.currency
+            """,
+            (
+                prize.get("id") or f"prz_{event_id}_{secrets.token_hex(3)}",
+                event_id,
+                prize["name"],
+                prize.get("description") or "",
+                prize.get("amount_cents"),
+                prize.get("currency") or "USD",
+            ),
+        )
+
+    for question in fixtures.get("custom_questions") or []:
+        conn.execute(
+            """
+            INSERT INTO custom_questions (id, event_id, prompt, kind, options, required, sort)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+            ON CONFLICT (id) DO UPDATE SET
+                prompt = excluded.prompt,
+                kind = excluded.kind,
+                options = excluded.options,
+                required = excluded.required
+            """,
+            (
+                question["id"],
+                event_id,
+                question["prompt"],
+                question.get("kind") or "text",
+                json.dumps(question.get("options") or []),
+                int(bool(question.get("required"))),
+            ),
         )
 
     for track in fixtures.get("tracks", []):
@@ -396,6 +448,18 @@ def seed(
                 now,
             ),
         )
+        for index, url in enumerate(project.get("images") or []):
+            conn.execute(
+                "INSERT INTO project_images (id, project_id, url, sort) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT (id) DO UPDATE SET url = excluded.url",
+                (f"img_{project['id']}_{index}", project["id"], url, index),
+            )
+        for question_id, answer in (project.get("custom_answers") or {}).items():
+            conn.execute(
+                "INSERT INTO project_answers (project_id, question_id, answer) VALUES (?, ?, ?) "
+                "ON CONFLICT (project_id, question_id) DO UPDATE SET answer = excluded.answer",
+                (project["id"], question_id, answer),
+            )
 
     # --- ballots ----------------------------------------------------------
     for score in fixtures.get("scores", []):
@@ -441,6 +505,44 @@ def seed(
                 event_id,
                 score["judge"],
                 score["project"],
+                now,
+            ),
+        )
+
+    for vote in fixtures.get("votes") or []:
+        conn.execute(
+            """
+            INSERT INTO votes (id, event_id, project_id, voter_key, voter_mode, credits, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (event_id, project_id, voter_key) DO UPDATE SET
+                credits = excluded.credits
+            """,
+            (
+                vote.get("id") or f"vot_{secrets.token_hex(6)}",
+                event_id,
+                vote["project"],
+                vote["voter_key"],
+                vote.get("voter_mode") or "authenticated",
+                int(vote.get("credits") or 1),
+                now,
+            ),
+        )
+
+    for hook in fixtures.get("webhooks") or []:
+        conn.execute(
+            """
+            INSERT INTO webhooks (id, event_id, url, secret, actions, active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id) DO UPDATE SET url = excluded.url, actions = excluded.actions,
+                active = excluded.active
+            """,
+            (
+                hook.get("id") or f"wh_{secrets.token_hex(4)}",
+                event_id,
+                hook["url"],
+                hook.get("secret") or f"whsec_{secrets.token_hex(12)}",
+                json.dumps(hook.get("actions") or ["*"]),
+                int(bool(hook.get("active", True))),
                 now,
             ),
         )
