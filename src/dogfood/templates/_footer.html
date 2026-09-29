@@ -10,9 +10,9 @@
       <h2>This site</h2>
       <a href="/">Home</a>
       <a href="/projects">Gallery</a>
-      <a href="/projects/new">Submit</a>
-      <a href="/teams">Teams</a>
-      <a href="/projects#community-vote">Vote</a>
+      {% if can_submit %}<a href="/projects/new">Submit</a>{% endif %}
+      {% if can_manage_team %}<a href="/teams">Teams</a>{% endif %}
+      {% if can_vote %}<a href="/projects#community-vote">Vote</a>{% endif %}
     </div>
     <div>
       <h2>Developers</h2>
@@ -24,8 +24,9 @@
     <div>
       <h2>Account</h2>
       <a href="/login">Sign in</a>
-      <a href="/organizer">Organizer</a>
-      <a href="/organizer/audit">Audit</a>
+      {% if is_judge %}<a href="/judge">Judge</a>{% endif %}
+      {% if can_aggregate %}<a href="/organizer">Organizer</a>{% endif %}
+      {% if can_audit %}<a href="/organizer/audit">Audit</a>{% endif %}
     </div>
   </div>
   <p class="wrap site-foot__copy">Raptors · event judging for teams that need a paper trail.</p>

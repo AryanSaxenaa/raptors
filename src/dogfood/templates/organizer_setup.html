@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Event setup &middot; Raptors{% endblock %}
+{% block body_class %}page-setup{% endblock %}
 
 {% block body %}
 <div class="fs-wave-band">
@@ -14,63 +15,101 @@
   </header>
 </div>
 
-<form class="panel" method="get" action="/organizer/setup" style="display:flex; gap:12px; align-items:flex-end">
-  <div style="flex:1">
-    <label for="event">Working event</label>
-    <select id="event" name="event" onchange="this.form.submit()">
-      {% for e in events %}
-        <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
+<form class="setup-event" method="get" action="/organizer/setup">
+  <label for="event">Working event</label>
+  <select id="event" name="event" onchange="this.form.submit()">
+    {% for e in events %}
+      <option value="{{ e.id }}" {% if e.id == event.id %}selected{% endif %}>{{ e.name }}</option>
+    {% endfor %}
+  </select>
 </form>
 
 <div id="flash" class="notice" hidden></div>
 
-<div class="grid c2">
+<div class="setup-pair">
   <div class="panel">
     <h3>Create a new event</h3>
-    <label for="ev-name">Name</label>
-    <input id="ev-name">
-    <label for="ev-close">Submissions close</label>
-    <input id="ev-close" placeholder="2026-03-01T23:59:59Z">
-    <div style="margin-top:14px"><button id="create-event">Create event</button></div>
+    <div class="setup-field">
+      <label for="ev-name">Name</label>
+      <input id="ev-name">
+    </div>
+    <div class="setup-field">
+      <label for="ev-close">Submissions close</label>
+      <input id="ev-close" placeholder="2026-03-01T23:59:59Z">
+    </div>
+    <div class="setup-field" aria-hidden="true"></div>
+    <div class="setup-actions"><button id="create-event">Create event</button></div>
   </div>
   <div class="panel">
     <h3>Publish &amp; voting window</h3>
-    <label><input type="checkbox" id="pub" {% if event.results_published %}checked{% endif %}> Results published</label>
-    <label for="vopen">Voting opens</label>
-    <input id="vopen" value="{{ event.voting_opens_at or '' }}">
-    <label for="vclose">Voting closes</label>
-    <input id="vclose" value="{{ event.voting_closes_at or '' }}">
-    <div style="margin-top:14px"><button id="save-event">Save event settings</button></div>
+    <div class="setup-field">
+      <label class="setup-check" for="pub">
+        <input type="checkbox" id="pub" {% if event.results_published %}checked{% endif %}>
+        Results published
+      </label>
+    </div>
+    <div class="setup-field">
+      <label for="vopen">Voting opens</label>
+      <input id="vopen" value="{{ event.voting_opens_at or '' }}">
+    </div>
+    <div class="setup-field">
+      <label for="vclose">Voting closes</label>
+      <input id="vclose" value="{{ event.voting_closes_at or '' }}">
+    </div>
+    <div class="setup-actions"><button id="save-event">Save event settings</button></div>
   </div>
 </div>
 
-<div class="grid c2">
+<div class="setup-pair">
   <div class="panel">
     <h3>Add track</h3>
-    <label for="track-name">Track name</label>
-    <input id="track-name">
-    <div style="margin-top:14px"><button id="add-track">Add track</button></div>
-    <p class="sum" style="margin-top:10px">Tracks on this event:</p>
-    <ul>{% for t in tracks %}<li class="mono">{{ t.id }} — {{ t.name }}</li>{% endfor %}</ul>
+    <div class="setup-field">
+      <label for="track-name">Track name</label>
+      <input id="track-name">
+    </div>
+    <div class="setup-field">
+      {% if tracks %}
+        <p class="sum">Tracks on this event</p>
+        <ul class="setup-tracks">
+          {% for t in tracks %}
+            <li>{{ t.name }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="sum">No tracks yet.</p>
+      {% endif %}
+    </div>
+    <div class="setup-field" aria-hidden="true"></div>
+    <div class="setup-actions"><button id="add-track">Add track</button></div>
   </div>
   <div class="panel">
     <h3>Invite judge</h3>
-    <label for="j-name">Name</label>
-    <input id="j-name">
-    <label for="j-email">Email</label>
-    <input id="j-email" type="email">
-    <label>Tracks</label>
-    {% for t in tracks %}
-      <label><input type="checkbox" class="j-track" value="{{ t.id }}"> {{ t.name }}</label><br>
-    {% endfor %}
-    <div style="margin-top:14px"><button id="invite-judge">Send invite</button></div>
+    <div class="setup-field">
+      <label for="j-name">Name</label>
+      <input id="j-name">
+    </div>
+    <div class="setup-field">
+      <label for="j-email">Email</label>
+      <input id="j-email" type="email">
+    </div>
+    <div class="setup-field">
+      <p class="sum">Tracks</p>
+      <div class="setup-track-picks">
+        {% for t in tracks %}
+          <label>
+            <input type="checkbox" class="j-track" value="{{ t.id }}">
+            {{ t.name }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="setup-actions"><button id="invite-judge">Send invite</button></div>
   </div>
 </div>
 
-<p><a href="/organizer">Back to progress dashboard</a> · <a href="/organizer/webhooks">Webhooks</a></p>
+<p class="setup-foot">
+  <a href="/organizer">Back to progress dashboard</a> · <a href="/organizer/webhooks">Webhooks</a>
+</p>
 {% endblock %}
 
 {% block scripts %}

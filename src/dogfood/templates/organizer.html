@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Organizer &middot; Raptors{% endblock %}
+{% block body_class %}page-organizer{% endblock %}
 
 {% block body %}
 <div class="fs-wave-band">
@@ -14,9 +15,26 @@
   </header>
 </div>
 
+<div class="org-shell">
+  <nav class="org-side" aria-label="On this page">
+    <p class="org-side__label">On this page</p>
+    <a href="#overview" data-section="overview">Overview</a>
+    <a href="#coverage" data-section="coverage">Coverage</a>
+    {% if progress.under_reviewed %}
+      <a href="#attention" data-section="attention">Attention</a>
+    {% endif %}
+    <a href="#judges" data-section="judges">Judges</a>
+    {% if duplicates_total %}
+      <a href="#duplicates" data-section="duplicates">Duplicates</a>
+    {% endif %}
+    <a href="#rubric" data-section="rubric">Rubric</a>
+    <a href="#exports" data-section="exports">Exports</a>
+  </nav>
+  <div class="org-main">
+
 <div id="flash" class="notice" hidden></div>
 
-<div class="grid c4">
+<div class="grid c4" id="overview">
   <div class="stat">
     <div class="n">{{ progress.percent_complete if progress.percent_complete is not none else '-' }}%</div>
     <div class="k">reviews complete</div>
@@ -35,9 +53,9 @@
   </div>
 </div>
 
-<h2>Coverage</h2>
+<h2 id="coverage">Coverage</h2>
 <div class="grid c2">
-  <div class="panel">
+  <div>
     <h3>Reviews per project</h3>
     <table>
       <thead><tr><th>Reviews</th><th class="num">Projects</th><th></th></tr></thead>
@@ -60,7 +78,7 @@
     </p>
   </div>
 
-  <div class="panel">
+  <div>
     <h3>Track capacity</h3>
     <table>
       <thead><tr><th>Track</th><th class="num">Judges</th><th class="num">Projects</th>
@@ -81,8 +99,8 @@
 </div>
 
 {% if progress.under_reviewed %}
-  <h2>Needs attention</h2>
-  <div class="panel scroll">
+  <h2 id="attention">Needs attention</h2>
+  <div class="org-block scroll">
     <table>
       <thead><tr><th>Project</th><th>Track</th><th class="num">Reviews</th>
         <th class="num">Short by</th></tr></thead>
@@ -105,8 +123,13 @@
   </div>
 {% endif %}
 
-<h2>Judge progress</h2>
-<div class="panel scroll">
+<h2 id="judges">Judge progress</h2>
+{% if judges_pager and judges_pager.total > judges_pager.page_size %}
+  {% set pager = judges_pager %}
+  {% set label = 'Judge progress pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
+<div class="org-block scroll">
   <table>
     <thead><tr><th>Judge</th><th class="num">Assigned</th><th class="num">Done</th>
       <th class="num">Outstanding</th><th style="width:220px">Progress</th></tr></thead>
@@ -127,10 +150,20 @@
     </tbody>
   </table>
 </div>
+{% if judges_pager and judges_pager.total > judges_pager.page_size %}
+  {% set pager = judges_pager %}
+  {% set label = 'Judge progress pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
 
-{% if duplicates %}
-  <h2>Duplicate submissions</h2>
-  <div class="panel scroll">
+{% if duplicates_total %}
+  <h2 id="duplicates">Duplicate submissions</h2>
+  {% if dup_pager and dup_pager.total > dup_pager.page_size %}
+    {% set pager = dup_pager %}
+    {% set label = 'Duplicate list pages' %}
+    {% include "_pager.html" with context %}
+  {% endif %}
+  <div class="org-block scroll">
     <table>
       <thead><tr><th>Duplicate</th><th>Of</th><th>Signal</th>
         <th class="num">Slots consumed</th><th>Decision</th></tr></thead>
@@ -153,10 +186,15 @@
       Confirming a duplicate drops it from the ranking. Those ballots still count when we calibrate judges.
     </p>
   </div>
+  {% if dup_pager and dup_pager.total > dup_pager.page_size %}
+    {% set pager = dup_pager %}
+    {% set label = 'Duplicate list pages' %}
+    {% include "_pager.html" with context %}
+  {% endif %}
 {% endif %}
 
-<h2>Rubric</h2>
-<div class="panel scroll">
+<h2 id="rubric">Rubric</h2>
+<div class="org-block scroll">
   <table>
     <thead><tr><th>Key</th><th>Label</th><th class="num">Weight</th></tr></thead>
     <tbody>
@@ -171,8 +209,8 @@
   </p>
 </div>
 
-<h2>Exports</h2>
-<div class="panel">
+<h2 id="exports">Exports</h2>
+<div class="org-block">
   <p class="sum">
     <a href="/organizer/setup?event={{ event.id }}">Event setup</a> &middot;
     <a href="/organizer/webhooks">Webhooks</a>
@@ -186,6 +224,9 @@
     {% endfor %}
     <a class="badge" href="/api/exports/event.json">event.json</a>
   </p>
+</div>
+
+  </div>
 </div>
 {% endblock %}
 
@@ -212,5 +253,37 @@ document.querySelectorAll('button[data-dup]').forEach(b => {
     } catch (e) { flash(e.message, 'bad'); }
   });
 });
+
+(function () {
+  const nav = document.querySelector('.org-side');
+  if (!nav) return;
+  const links = Array.from(nav.querySelectorAll('a[data-section]'));
+  const sections = links
+    .map((a) => document.getElementById(a.dataset.section))
+    .filter(Boolean);
+
+  links.forEach((a) => {
+    a.addEventListener('click', (e) => {
+      const el = document.getElementById(a.dataset.section);
+      if (!el) return;
+      e.preventDefault();
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.replaceState(null, '', '#' + a.dataset.section);
+    });
+  });
+
+  function sync() {
+    let current = sections[0];
+    for (const section of sections) {
+      if (section.getBoundingClientRect().top <= 148) current = section;
+    }
+    if (!current) return;
+    links.forEach((a) => {
+      a.classList.toggle('is-active', a.dataset.section === current.id);
+    });
+  }
+  sync();
+  window.addEventListener('scroll', sync, { passive: true });
+})();
 </script>
 {% endblock %}

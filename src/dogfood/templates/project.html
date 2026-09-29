@@ -17,11 +17,11 @@
       <a class="project-pill project-pill--muted" href="#comments">
         {{ comment_count }} comment{% if comment_count != 1 %}s{% endif %}
       </a>
-      {% if not who.is_anonymous %}
+      {% if can_vote and not who.is_anonymous %}
         <button type="button" class="project-pill project-pill--accent" id="hero-vote-btn">
           Support with credits
         </button>
-      {% else %}
+      {% elif who.is_anonymous %}
         <a class="project-pill project-pill--accent" href="/login">Sign in to vote</a>
       {% endif %}
       {% if project.live_url %}
@@ -135,7 +135,7 @@
       {% endif %}
     </section>
 
-    {% if not who.is_anonymous %}
+    {% if can_vote and not who.is_anonymous %}
       <section class="project-section project-vote-panel" id="project-vote" hidden>
         <h2 class="project-section__title">Community vote</h2>
         <p class="sum">You can spend up to <b>{{ credit_budget }}</b> credits here. Influence is the square root of credits on this project.</p>
@@ -206,7 +206,7 @@ if (btn) btn.addEventListener('click', async () => {
   }
 });
 
-{% if not who.is_anonymous %}
+{% if can_vote and not who.is_anonymous %}
 const eventId = {{ project.event_id | tojson }};
 const projectId = {{ project.id | tojson }};
 const votePanel = document.getElementById('project-vote');

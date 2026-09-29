@@ -146,16 +146,13 @@ def verify_chain(conn: sqlite3.Connection) -> dict[str, Any]:
     return {"ok": True, "entries": len(rows), "head_hash": prev_hash}
 
 
-def list_entries(
-    conn: sqlite3.Connection,
+def _entry_filters(
     *,
     event_id: str | None = None,
     action: str | None = None,
     reason_code: str | None = None,
     actor_user_id: str | None = None,
-    limit: int = 200,
-    offset: int = 0,
-) -> list[dict[str, Any]]:
+) -> tuple[str, list[Any]]:
     clauses, params = [], []
     if event_id:
         clauses.append("event_id = ?")
@@ -170,6 +167,43 @@ def list_entries(
         clauses.append("actor_user_id = ?")
         params.append(actor_user_id)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    return where, params
+
+
+def count_entries(
+    conn: sqlite3.Connection,
+    *,
+    event_id: str | None = None,
+    action: str | None = None,
+    reason_code: str | None = None,
+    actor_user_id: str | None = None,
+) -> int:
+    where, params = _entry_filters(
+        event_id=event_id,
+        action=action,
+        reason_code=reason_code,
+        actor_user_id=actor_user_id,
+    )
+    row = query_one(conn, f"SELECT COUNT(*) AS n FROM audit_log {where}", params)
+    return int(row["n"]) if row else 0
+
+
+def list_entries(
+    conn: sqlite3.Connection,
+    *,
+    event_id: str | None = None,
+    action: str | None = None,
+    reason_code: str | None = None,
+    actor_user_id: str | None = None,
+    limit: int = 200,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    where, params = _entry_filters(
+        event_id=event_id,
+        action=action,
+        reason_code=reason_code,
+        actor_user_id=actor_user_id,
+    )
     params.extend([min(limit, 1000), max(offset, 0)])
     rows = query(
         conn,

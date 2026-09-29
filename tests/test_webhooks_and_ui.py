@@ -91,6 +91,22 @@ def test_dev_login_attaches_seeded_session(client):
     assert who2.json()["role"] == "judge"
 
 
+def test_demo_logins_survive_sign_out(client):
+    """Quick sign-in rows must stay on /login after logout (fixed dev tokens)."""
+    page = client.get("/login")
+    assert page.status_code == 200
+    assert "/login/as/organizer" in page.text
+
+    signed_in = client.get("/login/as/organizer", follow_redirects=False)
+    assert signed_in.status_code == 303
+    client.post("/api/auth/logout", cookies=signed_in.cookies)
+
+    again = client.get("/login")
+    assert again.status_code == 200
+    assert "/login/as/organizer" in again.text
+    assert "/login/as/judge_a" in again.text
+
+
 def test_new_ui_routes(client):
     assert client.get("/teams").status_code == 200
     vote = client.get("/vote", follow_redirects=False)
@@ -188,3 +204,61 @@ def test_certificate_embargoed_until_publish(client):
     page = client.get("/certificates/prj_01", headers=auth(PARTICIPANT_TOKEN))
     assert page.status_code == 200
     assert "prj_01" in page.text or "Glass Signal" in page.text
+
+
+def test_html_pages_match_role_workspace(client):
+    """Nav hide is UX. Wrong-role HTML routes must redirect, not render a dead page."""
+    org = client.get("/", headers=auth(ORG_TOKEN))
+    assert org.status_code == 200
+    assert 'href="/judge"' not in org.text
+    assert 'href="/teams"' not in org.text
+    assert 'href="/projects/new"' not in org.text
+    assert 'href="/organizer"' in org.text
+    org_teams = client.get("/teams", headers=auth(ORG_TOKEN), follow_redirects=False)
+    assert org_teams.status_code == 303
+    assert org_teams.headers.get("location", "").endswith("/organizer")
+    org_submit = client.get("/projects/new", headers=auth(ORG_TOKEN), follow_redirects=False)
+    assert org_submit.status_code == 303
+    assert org_submit.headers.get("location", "").endswith("/organizer")
+    bounced = client.get("/judge", headers=auth(ORG_TOKEN), follow_redirects=False)
+    assert bounced.status_code == 303
+    assert bounced.headers.get("location", "").endswith("/organizer")
+    gallery_org = client.get("/projects", headers=auth(ORG_TOKEN)).text
+    assert "Cast vote" not in gallery_org
+    assert "Most votes" in gallery_org
+
+    judge = client.get("/", headers=auth(JUDGE_A_TOKEN))
+    assert judge.status_code == 200
+    assert 'href="/judge"' in judge.text
+    assert 'href="/teams"' not in judge.text
+    assert 'href="/projects/new"' not in judge.text
+    assert 'href="/organizer"' not in judge.text
+    assert client.get("/judge", headers=auth(JUDGE_A_TOKEN)).status_code == 200
+    judge_teams = client.get("/teams", headers=auth(JUDGE_A_TOKEN), follow_redirects=False)
+    assert judge_teams.status_code == 303
+    assert judge_teams.headers.get("location", "").endswith("/judge")
+    judge_submit = client.get("/projects/new", headers=auth(JUDGE_A_TOKEN), follow_redirects=False)
+    assert judge_submit.status_code == 303
+    assert judge_submit.headers.get("location", "").endswith("/judge")
+    judge_org = client.get("/organizer", headers=auth(JUDGE_A_TOKEN), follow_redirects=False)
+    assert judge_org.status_code == 303
+    assert judge_org.headers.get("location", "").endswith("/judge")
+
+    part = client.get("/", headers=auth(PARTICIPANT_TOKEN))
+    assert part.status_code == 200
+    assert 'href="/judge"' not in part.text
+    assert 'href="/organizer"' not in part.text
+    assert 'href="/teams"' in part.text
+    assert 'href="/projects/new"' in part.text
+    assert client.get("/teams", headers=auth(PARTICIPANT_TOKEN)).status_code == 200
+    assert "Create a team" in client.get("/teams", headers=auth(PARTICIPANT_TOKEN)).text
+    denied = client.get("/judge", headers=auth(PARTICIPANT_TOKEN), follow_redirects=False)
+    assert denied.status_code == 303
+    assert denied.headers.get("location", "").endswith("/")
+    part_org = client.get("/organizer", headers=auth(PARTICIPANT_TOKEN), follow_redirects=False)
+    assert part_org.status_code == 303
+    assert part_org.headers.get("location", "").endswith("/")
+
+    public_teams = client.get("/teams")
+    assert public_teams.status_code == 200
+    assert "Sign in" in public_teams.text

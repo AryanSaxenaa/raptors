@@ -19,6 +19,7 @@ the architecture rather than a promise in a README.
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
@@ -28,11 +29,18 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import assignment, audit, results, seed
 from ..dev_session import lookup_dev_session, set_session_cookie
-from ..config import GALLERY_PAGE_SIZE
+from ..config import GALLERY_PAGE_SIZE, TABLE_PAGE_SIZE
 from ..db import parse_ts, query, query_one
 from ..deps import Conn, Who, default_event_id
 from ..errors import ApiError
-from ..security import Capability, has_capability, judge_record, judge_track_ids
+from ..security import (
+    Capability,
+    Operation,
+    has_capability,
+    has_operation,
+    judge_record,
+    judge_track_ids,
+)
 from .community import VOTE_CREDIT_BUDGET
 from .projects import gallery_rows, vote_tallies_visible
 
@@ -67,6 +75,51 @@ def _gallery_query_string(
     return urlencode(parts)
 
 
+def _pager_meta(*, page: int, page_size: int, total: int) -> dict[str, Any]:
+    page_count = max(1, (total + page_size - 1) // page_size)
+    page = max(1, min(page, page_count))
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "page_count": page_count,
+        "has_prev": page > 1,
+        "has_next": page < page_count,
+    }
+
+
+def _href_with_page(
+    path: str,
+    query: dict[str, str | int],
+    page: int,
+    *,
+    page_key: str = "page",
+) -> str:
+    parts = {k: str(v) for k, v in query.items() if v not in ("", None) and k != page_key}
+    if page > 1:
+        parts[page_key] = str(page)
+    qs = urlencode(parts)
+    return f"{path}?{qs}" if qs else path
+
+
+def _pager_hrefs(
+    path: str,
+    query: dict[str, str | int],
+    meta: dict[str, Any],
+    *,
+    page_key: str = "page",
+) -> dict[str, str | None]:
+    page = int(meta["page"])
+    return {
+        "prev_href": _href_with_page(path, query, page - 1, page_key=page_key)
+        if meta["has_prev"]
+        else None,
+        "next_href": _href_with_page(path, query, page + 1, page_key=page_key)
+        if meta["has_next"]
+        else None,
+    }
+
+
 def _templates(request: Request) -> Any:
     return request.app.state.templates
 
@@ -77,6 +130,22 @@ def _submissions_closed(close: str | None) -> bool:
     if deadline is None:
         return False
     return datetime.now(timezone.utc) >= deadline
+
+
+def _event_summaries(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    rows = query(
+        conn,
+        "SELECT id, name, submissions_close, is_fixture FROM events "
+        "ORDER BY is_fixture DESC, created_at",
+    )
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        closed = _submissions_closed(item.get("submissions_close"))
+        item["submissions_closed"] = closed
+        item["submissions_open"] = not closed
+        out.append(item)
+    return out
 
 
 def _youtube_id(url: str | None) -> str | None:
@@ -95,20 +164,69 @@ def _youtube_id(url: str | None) -> str | None:
     return None
 
 
+def _assigned_judge_event_id(conn: Conn, user_id: str) -> str | None:
+    if not user_id:
+        return None
+    row = query_one(
+        conn,
+        "SELECT event_id FROM judges WHERE user_id = ? AND status != 'removed' "
+        "ORDER BY event_id LIMIT 1",
+        (user_id,),
+    )
+    return None if row is None else str(row["event_id"])
+
+
+def _unassigned_judge_redirect(conn: Conn, who: Who, event_id: str) -> RedirectResponse | None:
+    """Send people without a judges-table row away from the scoring console.
+
+    Organizer/admin have OWN_SCORES in the published matrix so they can *read*
+    ballots, but they are not a scoring judge unless assigned. The matrix is
+    still enforced on the API; this redirect is only the HTML door.
+    """
+    if judge_record(conn, event_id, who.user_id) is not None:
+        return None
+    other = _assigned_judge_event_id(conn, who.user_id)
+    if other and other != event_id:
+        return RedirectResponse(f"/judge?event={other}", status_code=303)
+    return RedirectResponse(_role_home(conn, who), status_code=303)
+
+
+def _role_home(conn: Conn, who: Who) -> str:
+    if who.is_anonymous:
+        return "/login"
+    if has_capability(who.role, Capability.AGGREGATE):
+        return "/organizer"
+    if _assigned_judge_event_id(conn, who.user_id):
+        return "/judge"
+    return "/"
+
+
+def _bounce_unless(conn: Conn, who: Who, allowed: bool) -> RedirectResponse | None:
+    if allowed:
+        return None
+    return RedirectResponse(_role_home(conn, who), status_code=303)
+
+
+def _can_use_submit_workspace(who: Who) -> bool:
+    """Create/join team and submit are the participant workspace.
+
+    Organizers keep MANAGE_TEAM on the API; this HTML is the 'before you
+    submit' flow, which judges and organizers should not land on.
+    """
+    return who.is_anonymous or has_operation(who.role, Operation.SUBMIT_PROJECT)
+
+
 def _base(request: Request, conn: Conn, who: Who) -> dict[str, Any]:
+    can_submit = _can_use_submit_workspace(who)
     return {
         "who": who,
         "can_aggregate": has_capability(who.role, Capability.AGGREGATE),
         "can_audit": has_capability(who.role, Capability.AUDIT_LOG),
-        "is_judge": has_capability(who.role, Capability.OWN_SCORES),
-        "events": [
-            dict(row)
-            for row in query(
-                conn,
-                "SELECT id, name, submissions_close, is_fixture FROM events "
-                "ORDER BY is_fixture DESC, created_at",
-            )
-        ],
+        "is_judge": _assigned_judge_event_id(conn, who.user_id) is not None,
+        "can_submit": can_submit,
+        "can_manage_team": can_submit,
+        "can_vote": who.is_anonymous or has_operation(who.role, Operation.VOTE),
+        "events": _event_summaries(conn),
     }
 
 
@@ -157,12 +275,7 @@ def gallery(
     event: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
 ) -> Any:
-    """The public gallery. No authentication, and no pagination at fixture scale.
-
-    Page size is 200 against 41 fixture projects, and the default order is
-    arrival order, so page one is the whole event and the earliest projects are
-    on it. Both choices are asserted in tests/test_acceptance_invariants.py.
-    """
+    """The public gallery. Paginated so long event lists stay scannable."""
     offset = (page - 1) * GALLERY_PAGE_SIZE
     vote_event_id = event or default_event_id(conn)
     vote_row = query_one(conn, "SELECT * FROM events WHERE id = ?", (vote_event_id,))
@@ -192,8 +305,18 @@ def gallery(
     )
     track_rows = [dict(t) for t in tracks]
     list_qs = _gallery_query_string(
-        q=q, tag=tag, sort=list_sort, event=event, team=team, track=track
+        q=q, tag=tag, sort=list_sort, event=event, team=team, track=track, page=page
     )
+    pager = _pager_meta(page=page, page_size=GALLERY_PAGE_SIZE, total=total)
+    gallery_q = {
+        "event": event or "",
+        "q": q or "",
+        "track": track or "",
+        "team": team or "",
+        "tag": tag or "",
+        "sort": list_sort if list_sort != "arrival" else "",
+    }
+    pager_links = _pager_hrefs("/projects", gallery_q, pager)
     filter_qs = _gallery_query_string(q=q, tag=tag, sort=list_sort, event=event, team=team)
     track_nav = [
         {
@@ -228,6 +351,7 @@ def gallery(
             "total": total,
             "page": page,
             "page_size": GALLERY_PAGE_SIZE,
+            "pager": {**pager, **pager_links},
             "filters": {
                 "q": q or "",
                 "track": track or "",
@@ -254,6 +378,9 @@ def submit_page(request: Request, conn: Conn, who: Who, event: str | None = None
     API refuses the write. Hiding the form would be the frontend doing the
     enforcement, which is the thing the brief is explicit about not accepting.
     """
+    bounced = _bounce_unless(conn, who, _can_use_submit_workspace(who))
+    if bounced is not None:
+        return bounced
     event_id = event or default_event_id(conn)
     row = query_one(conn, "SELECT * FROM events WHERE id = ?", (event_id,))
     if row is None:
@@ -359,6 +486,12 @@ def project_page(request: Request, conn: Conn, who: Who, project_id: str) -> Any
 
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, conn: Conn, who: Who) -> Any:
+    from ..db import transaction
+    from ..seed import ensure_dev_logins
+
+    if request.app.state.settings.dev_tokens:
+        with transaction(conn):
+            ensure_dev_logins(conn, dev_tokens=True)
     logins = query(
         conn,
         """
@@ -390,7 +523,13 @@ def login_as_seeded_session(request: Request, conn: Conn, label: str) -> Redirec
 
 
 @router.get("/judge", response_class=HTMLResponse)
-def judge_console(request: Request, conn: Conn, who: Who, event: str | None = None) -> Any:
+def judge_console(
+    request: Request,
+    conn: Conn,
+    who: Who,
+    event: str | None = None,
+    page: int = Query(default=1, ge=1),
+) -> Any:
     """The review queue.
 
     Thirty projects in five hours is a UX problem before it is anything else, so
@@ -398,15 +537,31 @@ def judge_console(request: Request, conn: Conn, who: Who, event: str | None = No
     ballot.
     """
     event_id = event or default_event_id(conn)
-    if not has_capability(who.role, Capability.OWN_SCORES):
-        return RedirectResponse("/login", status_code=303)
+    bounced = _unassigned_judge_redirect(conn, who, event_id)
+    if bounced is not None:
+        return bounced
     record = judge_record(conn, event_id, who.user_id)
     if record is None:
-        return _templates(request).TemplateResponse(
-            request,
-            "judge.html",
-            {**_base(request, conn, who), "judge": None, "event_id": event_id, "queue": []},
-        )
+        return RedirectResponse("/", status_code=303)
+    queue_total = query_one(
+        conn,
+        "SELECT COUNT(*) AS n FROM assignments WHERE event_id = ? AND judge_id = ?",
+        (event_id, record["id"]),
+    )["n"]
+    queue_scored = query_one(
+        conn,
+        """
+        SELECT COUNT(*) AS n FROM assignments a
+         WHERE a.event_id = ? AND a.judge_id = ?
+           AND EXISTS (
+             SELECT 1 FROM scores s
+              WHERE s.judge_id = a.judge_id AND s.project_id = a.project_id
+           )
+        """,
+        (event_id, record["id"]),
+    )["n"]
+    pager = _pager_meta(page=page, page_size=TABLE_PAGE_SIZE, total=int(queue_total))
+    offset = (pager["page"] - 1) * TABLE_PAGE_SIZE
     rows = query(
         conn,
         """
@@ -416,10 +571,14 @@ def judge_console(request: Request, conn: Conn, who: Who, event: str | None = No
           FROM assignments a
           LEFT JOIN projects p ON p.id = a.project_id
           LEFT JOIN tracks tr ON tr.id = p.track_id
-         WHERE a.event_id = ? AND a.judge_id = ? ORDER BY scored ASC, a.project_id ASC
+         WHERE a.event_id = ? AND a.judge_id = ?
+         ORDER BY scored ASC, a.project_id ASC
+         LIMIT ? OFFSET ?
         """,
-        (event_id, record["id"]),
+        (event_id, record["id"], TABLE_PAGE_SIZE, offset),
     )
+    judge_q: dict[str, str | int] = {"event": event_id}
+    pager_links = _pager_hrefs("/judge", judge_q, pager)
     return _templates(request).TemplateResponse(
         request,
         "judge.html",
@@ -429,6 +588,9 @@ def judge_console(request: Request, conn: Conn, who: Who, event: str | None = No
             "event_id": event_id,
             "tracks": sorted(judge_track_ids(conn, record["id"])),
             "queue": [dict(r) for r in rows],
+            "queue_total": int(queue_total),
+            "queue_scored": int(queue_scored),
+            "pager": {**pager, **pager_links},
         },
     )
 
@@ -438,8 +600,9 @@ def judge_ballot(request: Request, conn: Conn, who: Who, project_id: str) -> Any
     from .judging import get_assigned_project
 
     event_id = default_event_id(conn)
-    if not has_capability(who.role, Capability.OWN_SCORES):
-        return RedirectResponse("/login", status_code=303)
+    bounced = _unassigned_judge_redirect(conn, who, event_id)
+    if bounced is not None:
+        return bounced
     # Reuses the API handler, so the page cannot be more permissive than the
     # endpoint: the track and assignment guards are the same code.
     payload = get_assigned_project(conn, who, project_id, event_id)
@@ -451,18 +614,51 @@ def judge_ballot(request: Request, conn: Conn, who: Who, project_id: str) -> Any
 
 
 @router.get("/organizer", response_class=HTMLResponse)
-def organizer_dashboard(request: Request, conn: Conn, who: Who, event: str | None = None) -> Any:
+def organizer_dashboard(
+    request: Request,
+    conn: Conn,
+    who: Who,
+    event: str | None = None,
+    page: int = Query(default=1, ge=1),
+    dup_page: int = Query(default=1, ge=1),
+) -> Any:
+    bounced = _bounce_unless(conn, who, has_capability(who.role, Capability.AGGREGATE))
+    if bounced is not None:
+        return bounced
     event_id = event or default_event_id(conn)
-    if not has_capability(who.role, Capability.AGGREGATE):
-        return RedirectResponse("/login", status_code=303)
+    progress = assignment.progress(conn, event_id)
+    judges = progress["judges"]
+    duplicates = seed.duplicate_report(conn, event_id)
+    judges_pager = _pager_meta(page=page, page_size=TABLE_PAGE_SIZE, total=len(judges))
+    j_start = (judges_pager["page"] - 1) * TABLE_PAGE_SIZE
+    judges_page = judges[j_start : j_start + TABLE_PAGE_SIZE]
+    dup_pager = _pager_meta(page=dup_page, page_size=TABLE_PAGE_SIZE, total=len(duplicates))
+    d_start = (dup_pager["page"] - 1) * TABLE_PAGE_SIZE
+    duplicates_page = duplicates[d_start : d_start + TABLE_PAGE_SIZE]
+    org_q: dict[str, str | int] = {}
+    if event:
+        org_q["event"] = event_id
+    judges_q = dict(org_q)
+    if dup_page > 1:
+        judges_q["dup_page"] = dup_page
+    dup_q = dict(org_q)
+    if page > 1:
+        dup_q["page"] = page
+    judges_links = _pager_hrefs("/organizer", judges_q, judges_pager)
+    dup_links = _pager_hrefs("/organizer", dup_q, dup_pager, page_key="dup_page")
+    progress_view = {**progress, "judges": judges_page}
     return _templates(request).TemplateResponse(
         request,
         "organizer.html",
         {
             **_base(request, conn, who),
             "event": dict(query_one(conn, "SELECT * FROM events WHERE id = ?", (event_id,))),
-            "progress": assignment.progress(conn, event_id),
-            "duplicates": seed.duplicate_report(conn, event_id),
+            "progress": progress_view,
+            "judges_total": len(judges),
+            "judges_pager": {**judges_pager, **judges_links},
+            "duplicates": duplicates_page,
+            "duplicates_total": len(duplicates),
+            "dup_pager": {**dup_pager, **dup_links},
             "rubric": [
                 dict(r)
                 for r in query(
@@ -478,12 +674,44 @@ def organizer_dashboard(request: Request, conn: Conn, who: Who, event: str | Non
 
 @router.get("/organizer/results", response_class=HTMLResponse)
 def organizer_results(
-    request: Request, conn: Conn, who: Who, event: str | None = None, method: str | None = None
+    request: Request,
+    conn: Conn,
+    who: Who,
+    event: str | None = None,
+    method: str | None = None,
+    page: int = Query(default=1, ge=1),
+    diag_page: int = Query(default=1, ge=1),
 ) -> Any:
+    bounced = _bounce_unless(conn, who, has_capability(who.role, Capability.AGGREGATE))
+    if bounced is not None:
+        return bounced
     event_id = event or default_event_id(conn)
-    if not has_capability(who.role, Capability.AGGREGATE):
-        return RedirectResponse("/login", status_code=303)
     result = results.get_results(conn, event_id, method=method)
+    board = results.leaderboard(conn, event_id, method=method)
+    pager = _pager_meta(page=page, page_size=TABLE_PAGE_SIZE, total=len(board))
+    start = (pager["page"] - 1) * TABLE_PAGE_SIZE
+    board_page = board[start : start + TABLE_PAGE_SIZE]
+    diagnostics = result.judges
+    diag_pager = _pager_meta(
+        page=diag_page, page_size=TABLE_PAGE_SIZE, total=len(diagnostics)
+    )
+    d_start = (diag_pager["page"] - 1) * TABLE_PAGE_SIZE
+    diagnostics_page = diagnostics[d_start : d_start + TABLE_PAGE_SIZE]
+    results_q: dict[str, str | int] = {}
+    if event:
+        results_q["event"] = event_id
+    if method:
+        results_q["method"] = method
+    if diag_page > 1:
+        results_q["diag_page"] = diag_page
+    leaderboard_q = dict(results_q)
+    diag_q = dict(results_q)
+    if page > 1:
+        diag_q["page"] = page
+    pager_links = _pager_hrefs("/organizer/results", leaderboard_q, pager)
+    diag_links = _pager_hrefs(
+        "/organizer/results", diag_q, diag_pager, page_key="diag_page"
+    )
     return _templates(request).TemplateResponse(
         request,
         "results.html",
@@ -491,27 +719,46 @@ def organizer_results(
             **_base(request, conn, who),
             "event_id": event_id,
             "result": result,
-            "leaderboard": results.leaderboard(conn, event_id, method=method),
+            "leaderboard": board_page,
+            "leaderboard_total": len(board),
             "method": result.method,
+            "pager": {**pager, **pager_links},
+            "judge_diagnostics": diagnostics_page,
+            "diag_pager": {**diag_pager, **diag_links},
         },
     )
 
 
 @router.get("/organizer/audit", response_class=HTMLResponse)
 def organizer_audit(
-    request: Request, conn: Conn, who: Who, action: str | None = None, limit: int = 150
+    request: Request,
+    conn: Conn,
+    who: Who,
+    action: str | None = None,
+    page: int = Query(default=1, ge=1),
 ) -> Any:
     """The audit trail, readable without a database client."""
-    if not has_capability(who.role, Capability.AUDIT_LOG):
-        return RedirectResponse("/login", status_code=303)
+    bounced = _bounce_unless(conn, who, has_capability(who.role, Capability.AUDIT_LOG))
+    if bounced is not None:
+        return bounced
+    total = audit.count_entries(conn, action=action)
+    pager = _pager_meta(page=page, page_size=TABLE_PAGE_SIZE, total=total)
+    offset = (pager["page"] - 1) * TABLE_PAGE_SIZE
+    audit_q: dict[str, str | int] = {}
+    if action:
+        audit_q["action"] = action
+    pager_links = _pager_hrefs("/organizer/audit", audit_q, pager)
     return _templates(request).TemplateResponse(
         request,
         "audit.html",
         {
             **_base(request, conn, who),
-            "entries": audit.list_entries(conn, action=action, limit=limit),
+            "entries": audit.list_entries(
+                conn, action=action, limit=TABLE_PAGE_SIZE, offset=offset
+            ),
             "chain": audit.verify_chain(conn),
             "action_filter": action or "",
+            "pager": {**pager, **pager_links},
             "actions": [
                 r["action"]
                 for r in query(
@@ -530,6 +777,9 @@ def teams_page(
     event: str | None = None,
     invite: str | None = Query(default=None),
 ) -> Any:
+    bounced = _bounce_unless(conn, who, _can_use_submit_workspace(who))
+    if bounced is not None:
+        return bounced
     event_id = event or default_event_id(conn)
     row = query_one(conn, "SELECT * FROM events WHERE id = ?", (event_id,))
     if row is None:
@@ -580,9 +830,10 @@ def vote_page(event: str | None = None) -> RedirectResponse:
 
 @router.get("/organizer/setup", response_class=HTMLResponse)
 def organizer_setup(request: Request, conn: Conn, who: Who, event: str | None = None) -> Any:
+    bounced = _bounce_unless(conn, who, has_capability(who.role, Capability.AGGREGATE))
+    if bounced is not None:
+        return bounced
     event_id = event or default_event_id(conn)
-    if not has_capability(who.role, Capability.AGGREGATE):
-        return RedirectResponse("/login", status_code=303)
     row = query_one(conn, "SELECT * FROM events WHERE id = ?", (event_id,))
     if row is None:
         raise ApiError("not_found", f"no event '{event_id}'")
@@ -601,17 +852,36 @@ def organizer_setup(request: Request, conn: Conn, who: Who, event: str | None = 
 
 
 @router.get("/organizer/webhooks", response_class=HTMLResponse)
-def organizer_webhooks_page(request: Request, conn: Conn, who: Who) -> Any:
-    if not has_capability(who.role, Capability.AGGREGATE):
-        return RedirectResponse("/login", status_code=303)
+def organizer_webhooks_page(
+    request: Request,
+    conn: Conn,
+    who: Who,
+    page: int = Query(default=1, ge=1),
+) -> Any:
+    bounced = _bounce_unless(conn, who, has_capability(who.role, Capability.AGGREGATE))
+    if bounced is not None:
+        return bounced
+    total_row = query_one(
+        conn, "SELECT COUNT(*) AS n FROM webhooks WHERE active = 1"
+    )
+    total = int(total_row["n"]) if total_row else 0
+    pager = _pager_meta(page=page, page_size=TABLE_PAGE_SIZE, total=total)
+    offset = (pager["page"] - 1) * TABLE_PAGE_SIZE
     hooks = query(
         conn,
-        "SELECT id, event_id, url, active FROM webhooks WHERE active = 1 ORDER BY created_at DESC",
+        "SELECT id, event_id, url, active FROM webhooks WHERE active = 1 "
+        "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (TABLE_PAGE_SIZE, offset),
     )
+    pager_links = _pager_hrefs("/organizer/webhooks", {}, pager)
     return _templates(request).TemplateResponse(
         request,
         "organizer_webhooks.html",
-        {**_base(request, conn, who), "hooks": [dict(h) for h in hooks]},
+        {
+            **_base(request, conn, who),
+            "hooks": [dict(h) for h in hooks],
+            "pager": {**pager, **pager_links},
+        },
     )
 
 

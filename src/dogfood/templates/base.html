@@ -13,7 +13,11 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-{% block atmosphere %}{% endblock %}
+{% block atmosphere %}
+<div class="fx-stage fx-stage--page" aria-hidden="true">
+  <canvas data-fx="grid"></canvas>
+</div>
+{% endblock %}
 <header class="top">
   <div class="wrap top-shell">
     <a class="brand" href="/" aria-label="Raptors home">
@@ -23,9 +27,9 @@
     <div class="top-float">
       <nav>
         <a href="/projects">Gallery</a>
-        <a href="/projects/new">Submit</a>
-        <a href="/teams">Teams</a>
-        <a href="/projects#community-vote">Vote</a>
+        {% if can_submit %}<a href="/projects/new">Submit</a>{% endif %}
+        {% if can_manage_team %}<a href="/teams">Teams</a>{% endif %}
+        {% if can_vote %}<a href="/projects#community-vote">Vote</a>{% endif %}
         {% if is_judge %}<a href="/judge">Judge</a>{% endif %}
         {% if can_aggregate %}<a href="/organizer">Organizer</a>
         <a href="/organizer/setup">Setup</a>

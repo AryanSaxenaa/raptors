@@ -15,6 +15,9 @@
   <link rel="stylesheet" href="{{ static_url('app.css') }}">
 </head>
 <body>
+<div class="fx-stage fx-stage--page" aria-hidden="true">
+  <canvas data-fx="grid"></canvas>
+</div>
 <header class="top"><div class="wrap bar">
   <a class="brand" href="/"><img src="{{ static_url('logo-raptors-on-dark.svg') }}" alt="Raptors" width="160" height="36"></a>
   <nav><a href="/projects">Gallery</a><a href="/login">Sign in</a></nav>
@@ -65,5 +68,7 @@
   </div>
 </main>
 {% include "_footer.html" %}
+<script src="{{ static_url('ditherwave.umd.js') }}" defer></script>
+<script src="{{ static_url('atmosphere.js') }}" defer></script>
 </body>
 </html>

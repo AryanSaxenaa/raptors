@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dogfood.normalize import K_SHRINK, Observation, compute, weighted_value
+from dogfood.normalize import K_SHRINK, Observation, compute, labelled_recovery, weighted_value
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "fixtures.json"
@@ -59,3 +59,22 @@ def test_duplicate_excluded_from_ranking(fixtures: dict):
 
 def test_k_shrink_constant():
     assert K_SHRINK == 5.0
+
+
+def test_labelled_panel_recovers_planted_effects(fixtures: dict):
+    sim = labelled_recovery(fixtures)
+    assert sim["converged"]
+    assert sim["pearson_project"] > 0.85
+    assert sim["pearson_bias"] > 0.80
+    assert sim["kendall_fit_vs_truth"] > sim["kendall_raw_vs_truth"]
+    assert sim["spread_after"] < sim["spread_before"]
+
+
+def test_proof_includes_synthetic_section(fixtures: dict):
+    from dogfood.normalize import build_proof
+
+    text = build_proof(fixtures)
+    assert "LABELLED SYNTHETIC PANEL" in text
+    assert "illustrative numbers" in text
+    assert "0.94" in text
+    assert "sigma = 0.4127" in text

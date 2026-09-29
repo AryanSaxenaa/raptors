@@ -28,6 +28,10 @@
 </div>
 
 <h2>Active subscriptions</h2>
+{% if pager and pager.total > pager.page_size %}
+  {% set label = 'Webhook list pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
 <div class="panel scroll">
   <table>
     <thead><tr><th>Id</th><th>Event</th><th>URL</th><th></th></tr></thead>
@@ -47,6 +51,10 @@
   </table>
   {% if not hooks %}<p class="sum">No webhooks yet.</p>{% endif %}
 </div>
+{% if pager and pager.total > pager.page_size %}
+  {% set label = 'Webhook list pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
 
 <p><a href="/organizer/setup">Event setup</a> · <a href="/organizer">Dashboard</a></p>
 {% endblock %}

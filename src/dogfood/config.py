@@ -85,9 +85,10 @@ def load_settings() -> Settings:
 
 settings = load_settings()
 
-# Gallery page size. Deliberately far above the 41-project fixture set: the
-# acceptance suite greps page one of the gallery for fixture project titles, so
-# page one has to be the whole fixture event at fixture scale.
-GALLERY_PAGE_SIZE = 200
+# Gallery cards per page. Fixture titles are spread across pages; smoke walks pages.
+GALLERY_PAGE_SIZE = 18
+
+# Long HTML tables (judge queue, audit, results leaderboard).
+TABLE_PAGE_SIZE = 20
 
 SCHEMA_VERSION = "1"

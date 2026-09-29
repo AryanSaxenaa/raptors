@@ -125,22 +125,6 @@
   </div>
 </section>
 
-{% if event.submissions_close %}
-<div class="fs-wave-band">
-  <div class="fx-stage fx-stage--waves fx-stage--quiet" aria-hidden="true">
-    <canvas data-fx="waves"></canvas>
-  </div>
-  <p class="lede" style="margin:0">
-    Submissions for <b>{{ event.name }}</b> closed {{ event.submissions_close }}.
-    {% if who.is_anonymous %}
-      Browse the gallery, or sign in to vote and comment.
-    {% elif who.role == 'participant' %}
-      You can still edit a draft on an open event. Pick the event on Submit.
-    {% endif %}
-  </p>
-</div>
-{% endif %}
-
 {% if can_aggregate and duplicates %}
   <h2>Possible duplicates</h2>
   <div class="panel">
@@ -170,19 +154,19 @@
 {% endif %}
 
 <h2>Jump in</h2>
-<div class="grid c2">
-  <div class="panel">
+<div class="grid c2 home-jump-in">
+  <div class="panel home-jump-in__panel">
     <h3>
       {% if who.is_anonymous %}For everyone
       {% elif who.role == 'participant' %}For your team
       {% elif who.role == 'judge' %}For judging
       {% else %}For organizers{% endif %}
     </h3>
-    <ul>
+    <ul class="home-jump-in__list">
       <li><a href="/projects">Gallery</a> — browse projects, comment, and vote.</li>
       {% if who.is_anonymous or who.role == 'participant' %}
         <li><a href="/teams">Teams</a> — create a team or join with an invite code.</li>
-        <li><a href="/projects/new">Submit</a> — save a draft, then publish before the deadline.</li>
+        <li><a href="/projects/new">Submit</a> — pick an open event, save a draft, then publish before its deadline.</li>
       {% endif %}
       {% if is_judge %}
         <li><a href="/judge">Judge console</a> — score only the projects assigned to you.</li>
@@ -195,33 +179,59 @@
         <li><a href="/organizer/audit">Audit trail</a> — every write and access denial, in order.</li>
       {% endif %}
       {% if who.is_anonymous %}
-        <li><a href="/login">Sign in</a> — use the account your organizer sent you.</li>
+        <li><a href="/login">Sign in</a> — use the email and password your organizer sent you.</li>
       {% endif %}
     </ul>
   </div>
-  <div class="panel">
+  <div class="panel home-jump-in__panel">
     <h3>Events</h3>
-    <div class="scroll"><table>
+    <div class="home-jump-in__table-wrap">
+    <table>
       <thead><tr><th>Event</th><th>Submissions</th><th></th></tr></thead>
       <tbody>
       {% for e in events %}
         <tr>
           <td>{{ e.name }}</td>
-          <td>{% if e.submissions_close %}{{ e.submissions_close }}{% else %}Open{% endif %}</td>
-          <td>
+          <td class="dim">
             {% if e.submissions_close %}
-              <span class="badge">Closed</span>
+              {% if e.submissions_closed %}
+                Closed {{ e.submissions_close[:10] }}
+              {% else %}
+                Open until {{ e.submissions_close[:10] }}
+              {% endif %}
             {% else %}
+              No deadline set
+            {% endif %}
+          </td>
+          <td>
+            {% if e.submissions_open %}
               <span class="badge ok">Open</span>
+            {% else %}
+              <span class="badge">Closed</span>
             {% endif %}
           </td>
         </tr>
       {% endfor %}
       </tbody>
-    </table></div>
-    <p class="sum" style="margin-top:10px">
-      Switch events from Submit, Teams, or the gallery when more than one is running.
+    </table>
+    </div>
+    {% if events | length > 1 %}
+    <p class="sum home-jump-in__foot">
+      {% if can_submit %}
+        Choose the event on Submit, Teams, or the gallery when more than one is active.
+      {% elif is_judge %}
+        Choose the event on the gallery or judge console when more than one is active.
+      {% elif can_aggregate %}
+        Choose the event on the organizer console when more than one is active.
+      {% else %}
+        Choose the event on the gallery when more than one is active.
+      {% endif %}
     </p>
+    {% else %}
+    <p class="sum home-jump-in__foot">
+      All gallery and judging activity uses this event.
+    </p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

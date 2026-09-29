@@ -15,7 +15,7 @@
     <h1>Judge console</h1>
 
 {% if not judge %}
-  <div class="notice warn fs-wave-band__notice">
+  <div class="notice fs-wave-band__notice">
     You are signed in as <b>{{ who.role }}</b>, and you are not assigned as a judge on this event.
   </div>
 {% else %}
@@ -30,8 +30,8 @@
 </div>
 
 {% if judge %}
-  {% set done = queue | selectattr('scored') | list | length %}
-  {% set total = queue | length %}
+  {% set total = queue_total if queue_total is defined else (queue | length) %}
+  {% set done = queue_scored if queue_scored is defined else (queue | selectattr('scored') | list | length) %}
   <div class="fs-stats-strip">
     <div class="fs-stats-strip__item">
       <div class="fs-stats-strip__n">{{ total }}</div>
@@ -54,6 +54,10 @@
   {% endif %}
 
   <h2 class="fs-queue-head">Your queue</h2>
+  {% if pager and pager.total > pager.page_size %}
+    {% set label = 'Judge queue pages' %}
+    {% include "_pager.html" with context %}
+  {% endif %}
   <div class="scroll">
     <table class="fs-queue-table">
       <thead><tr>
@@ -83,6 +87,10 @@
       </tbody>
     </table>
   </div>
+  {% if pager and pager.total > pager.page_size %}
+    {% set label = 'Judge queue pages' %}
+    {% include "_pager.html" with context %}
+  {% endif %}
 
   <div class="fs-note">
     <h3>Your judging record</h3>

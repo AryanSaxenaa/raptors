@@ -49,6 +49,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import random
 import statistics
 import sys
 from collections import defaultdict
@@ -433,6 +434,130 @@ def _assign_ranks(result: NormalizationResult) -> None:
         project.rank_delta = (project.rank_raw or position) - position
 
 
+# ------------------------------------------- labelled synthetic recovery ---
+
+
+SYNTHETIC_SEED = 20260301
+
+
+def _pearson(xs: Sequence[float], ys: Sequence[float]) -> float:
+    if len(xs) < 2 or len(xs) != len(ys):
+        return 0.0
+    mx = statistics.fmean(xs)
+    my = statistics.fmean(ys)
+    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    dx = math.sqrt(sum((x - mx) ** 2 for x in xs))
+    dy = math.sqrt(sum((y - my) ** 2 for y in ys))
+    if dx == 0 or dy == 0:
+        return 0.0
+    return num / (dx * dy)
+
+
+def _ranks(values: Sequence[float], *, ids: Sequence[str]) -> list[int]:
+    """Competition ranks, high value first. Ties broken by id so they are stable."""
+    order = sorted(range(len(values)), key=lambda i: (-values[i], ids[i]))
+    ranks = [0] * len(values)
+    for position, i in enumerate(order, start=1):
+        ranks[i] = position
+    return ranks
+
+
+def _kendall_tau(ranks_a: Sequence[int], ranks_b: Sequence[int]) -> float:
+    n = len(ranks_a)
+    conc = disc = 0
+    for i in range(n):
+        for j in range(i + 1, n):
+            da = ranks_a[i] - ranks_a[j]
+            db = ranks_b[i] - ranks_b[j]
+            product = da * db
+            if product > 0:
+                conc += 1
+            elif product < 0:
+                disc += 1
+    denom = conc + disc
+    return (conc - disc) / denom if denom else 0.0
+
+
+def labelled_recovery(
+    fixtures: dict[str, Any],
+    *,
+    seed: int = SYNTHETIC_SEED,
+    mu: float = 3.5,
+    project_sd: float = 0.55,
+    judge_sd: float = 0.80,
+    noise_sd: float = 0.30,
+) -> dict[str, Any]:
+    """Fit the estimator on a panel with the fixture's missingness and known truth.
+
+    Cells (judge, project) match fixtures.json exactly. Project effects and
+    judge biases are drawn, then observations are generated from
+        y_ij = mu + p_i + b_j + e_ij
+    clipped to the rubric. Recovery is compared against that planted truth —
+    not against the real scores — so a high correlation is a claim that the
+    method finds a known effect, not merely that it reduced spread.
+    """
+    rng = random.Random(seed)
+    scores = fixtures.get("scores") or []
+    project_ids = sorted({s["project"] for s in scores})
+    judge_ids = sorted({s["judge"] for s in scores})
+
+    truth_p = {pid: rng.gauss(0.0, project_sd) for pid in project_ids}
+    truth_b = {jid: rng.gauss(0.0, judge_sd) for jid in judge_ids}
+    mean_p = statistics.fmean(truth_p.values())
+    mean_b = statistics.fmean(truth_b.values())
+    truth_p = {k: v - mean_p for k, v in truth_p.items()}
+    truth_b = {k: v - mean_b for k, v in truth_b.items()}
+
+    observations: list[Observation] = []
+    for score in scores:
+        value = (
+            mu
+            + truth_p[score["project"]]
+            + truth_b[score["judge"]]
+            + rng.gauss(0.0, noise_sd)
+        )
+        observations.append(
+            Observation(
+                judge_id=score["judge"],
+                project_id=score["project"],
+                value=min(5.0, max(1.0, value)),
+            )
+        )
+
+    result = compute(observations, method="additive_ridge", all_project_ids=project_ids)
+
+    scored = [p for p in result.projects if p.raw is not None]
+    recovered_p = [float(p.additive_ridge) - result.pooled_mean for p in scored]
+    planted_p = [truth_p[p.project_id] for p in scored]
+    raw_means = [float(p.raw) for p in scored]
+    ids = [p.project_id for p in scored]
+
+    bias_by_id = {j.judge_id: j.bias for j in result.judges}
+    recovered_b = [bias_by_id[jid] for jid in judge_ids]
+    planted_b = [truth_b[jid] for jid in judge_ids]
+
+    tau_raw = _kendall_tau(_ranks(planted_p, ids=ids), _ranks(raw_means, ids=ids))
+    tau_fit = _kendall_tau(_ranks(planted_p, ids=ids), _ranks(recovered_p, ids=ids))
+
+    return {
+        "seed": seed,
+        "mu": mu,
+        "project_sd": project_sd,
+        "judge_sd": judge_sd,
+        "noise_sd": noise_sd,
+        "observations": len(observations),
+        "projects": len(project_ids),
+        "judges": len(judge_ids),
+        "pearson_project": round(_pearson(planted_p, recovered_p), 4),
+        "pearson_bias": round(_pearson(planted_b, recovered_b), 4),
+        "kendall_raw_vs_truth": round(tau_raw, 4),
+        "kendall_fit_vs_truth": round(tau_fit, 4),
+        "spread_before": result.judge_spread_before,
+        "spread_after": result.judge_spread_after,
+        "converged": result.converged,
+    }
+
+
 # ------------------------------------------------------------- proof output ---
 
 
@@ -493,6 +618,11 @@ def build_proof(fixtures: dict[str, Any], *, weights: dict[str, float] | None = 
     w = out.append
     w("DOGFOOD 2026 -- cross-judge normalization proof")
     w("=" * 78)
+    w("")
+    w("The brief site's FIG. 03 used illustrative numbers (sigma 0.94 -> 0.31).")
+    w("Every figure below is computed from fixtures.json. Raw between-judge")
+    w("sigma is the population stdev of per-judge means (~0.41; sample stdev")
+    w("~0.42). Build against those values, not the illustration.")
     w("")
     w(f"observations        {result.observations}")
     w(f"projects            {len(result.projects)}"
@@ -578,6 +708,35 @@ def build_proof(fixtures: dict[str, Any], *, weights: dict[str, float] | None = 
             f"{titles.get(p.project_id, '')[:24]:<24} "
             f"raw rank {p.rank_raw} -> {p.rank_normalized}"
         )
+    w("")
+
+    sim = labelled_recovery(fixtures)
+    w("LABELLED SYNTHETIC PANEL (validation; not a substitute for the fixture)")
+    w("-" * 78)
+    w("Same (judge, project) cells as fixtures.json. Scores are generated from")
+    w("known project effects p_i, known judge biases b_j, and Gaussian noise:")
+    w(f"  y_ij = {sim['mu']} + p_i + b_j + e_ij,  "
+      f"p~N(0,{sim['project_sd']}), b~N(0,{sim['judge_sd']}), "
+      f"e~N(0,{sim['noise_sd']})")
+    w(f"  seed {sim['seed']}; clipped to the 1-5 rubric; "
+      f"{sim['observations']} cells, {sim['projects']} projects, "
+      f"{sim['judges']} judges")
+    w("")
+    w("  recovery vs planted truth")
+    w(f"    Pearson(p_i, recovered project effect)   {sim['pearson_project']:+.4f}")
+    w(f"    Pearson(b_j, recovered judge bias)       {sim['pearson_bias']:+.4f}")
+    w(f"    Kendall tau, raw means vs true ranking   {sim['kendall_raw_vs_truth']:+.4f}")
+    w(f"    Kendall tau, calibrated vs true ranking  {sim['kendall_fit_vs_truth']:+.4f}")
+    w(f"    between-judge sigma  {sim['spread_before']:.4f} -> {sim['spread_after']:.4f}"
+      f"  converged={sim['converged']}")
+    w("")
+    if sim["kendall_fit_vs_truth"] > sim["kendall_raw_vs_truth"]:
+        w("  Calibrated ranks match the planted project ranking more closely")
+        w("  than raw means do: the estimator recovers a known effect on this")
+        w("  missingness pattern, not only a smaller judge spread.")
+    else:
+        w("  On this draw, calibration did not beat raw means on Kendall tau.")
+        w("  Fixture analysis above is the primary claim.")
     w("")
     return "\n".join(out)
 

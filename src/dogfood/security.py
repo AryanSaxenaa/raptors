@@ -191,7 +191,8 @@ def issue_session(
     conn.execute(
         "INSERT INTO sessions (token, user_id, label, created_at, expires_at) "
         "VALUES (?, ?, ?, ?, NULL) "
-        "ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id",
+        "ON CONFLICT (token) DO UPDATE SET "
+        "user_id = excluded.user_id, label = excluded.label",
         (token, user_id, label, utcnow()),
     )
     return token

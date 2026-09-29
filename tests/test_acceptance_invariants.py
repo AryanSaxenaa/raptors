@@ -29,9 +29,18 @@ def test_gallery_is_public(client):
 
 
 def test_fixture_titles_on_gallery_page_one(client):
-    body = client.get("/projects").text.lower()
+    body_pages: list[str] = []
+    page = 1
+    while page <= 10:
+        response = client.get(f"/projects?page={page}")
+        assert response.status_code == 200
+        body_pages.append(response.text.lower())
+        if "Next" not in response.text:
+            break
+        page += 1
+    combined = "\n".join(body_pages)
     for title in _fixture_titles():
-        assert title.lower() in body
+        assert title.lower() in combined
 
 
 def test_closed_event_refuses_submissions(client):
@@ -70,8 +79,21 @@ def test_csv_export_has_comma_header(client):
 
 
 def test_gallery_page_size_covers_fixture_count(client):
-    """Pagination must not hide fixture titles on page one (PLAN DECISION 03)."""
+    """Every fixture title appears somewhere in the paginated gallery."""
+    from dogfood.config import GALLERY_PAGE_SIZE
+
     data = json.loads(FIXTURES_PATH.read_text(encoding="utf-8"))
-    n = len(data["projects"])
-    body = client.get("/projects").text
-    assert sum(1 for p in data["projects"] if p["title"] in body) == n
+    titles = [p["title"] for p in data["projects"]]
+    n = len(titles)
+    assert GALLERY_PAGE_SIZE < n, "fixture set should span multiple gallery pages"
+    found: set[str] = set()
+    page = 1
+    while page <= (n // GALLERY_PAGE_SIZE) + 2:
+        body = client.get(f"/projects?page={page}").text
+        for title in titles:
+            if title in body:
+                found.add(title)
+        if "Next" not in body:
+            break
+        page += 1
+    assert found == set(titles)

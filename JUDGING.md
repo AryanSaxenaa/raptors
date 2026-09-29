@@ -98,6 +98,10 @@ Largest rank movements: *Small Meadow* and *Flat Meadow* drop 9 places after cal
 
 `prj_41` (*Dry Harbour*, duplicate of `prj_07`): **excluded from ranking**, **ballots retained for calibration**. Dropping those ballots would bias the judges who saw both copies.
 
+The brief site's FIG. 03 (`σ = 0.94 → 0.31`) is illustrative. On `fixtures.json` the population stdev of per-judge means is **0.4127** (sample stdev ≈ 0.42). The proof artefact states that so a reviewer is not chasing the cartoon number.
+
+The same artefact also fits a **labelled synthetic panel**: same (judge, project) cells as the fixture, scores generated from known \(p_i\) and \(b_j\). That is validation, not a substitute for the fixture run. It is there to show the estimator recovers a planted effect — Kendall τ vs true ranking improves on raw means, and recovered project effects / judge biases correlate with truth — rather than only that spread fell.
+
 ## Isolation (the 25-cell matrix)
 
 The website publishes a 5×5 matrix. `run.py` checks three cells. This portal implements all 25 in `security.py` `ROLE_MATRIX` and walks them over HTTP in `tests/test_role_matrix.py`.
@@ -132,6 +136,7 @@ Gavel-style Bradley–Terry pairwise comparison is a genuine alternative: never 
 | Claim | Test / artefact |
 | --- | --- |
 | Spread drops ~40% on fixtures | `tests/test_normalize.py`, `docs/normalization-proof.txt` |
+| Labelled panel recovers planted \(p_i\), \(b_j\) | `test_labelled_panel_recovers_planted_effects` |
 | `jdg_07` flagged, not NaN | `test_zero_variance_judge_is_flagged_not_nan` |
 | `prj_41` excluded from ranking | `test_duplicate_excluded_from_ranking` |
 | 25-cell matrix | `tests/test_role_matrix.py` |

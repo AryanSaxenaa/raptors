@@ -73,8 +73,14 @@
       </div>
       <div>
         <label for="team">Team</label>
-        <select id="team">
-          {% for t in teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        <select id="team" {% if not teams %}disabled{% endif %} required>
+          {% if teams %}
+            {% for t in teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+          {% else %}
+            <option value="">
+              {% if who.is_anonymous %}Sign in, then create or join a team{% else %}No team on this event{% endif %}
+            </option>
+          {% endif %}
         </select>
       </div>
     </div>
@@ -175,7 +181,12 @@ async function send(submit) {
     const created = await api('POST', '/api/events/{{ event.id }}/projects', payload(submit));
     location.href = submit ? '/projects/' + created.id : '/projects/new?event={{ event.id }}';
   } catch (e) {
-    flash(e.message, 'bad');
+    const code = e.problem && e.problem.code;
+    if (code === 'not_authenticated' || e.status === 401) {
+      flash('Sign in to submit.', 'bad');
+    } else {
+      flash(e.message, 'bad');
+    }
   }
 }
 

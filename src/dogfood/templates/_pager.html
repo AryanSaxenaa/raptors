@@ -1,0 +1,17 @@
+{% if pager and pager.total > pager.page_size %}
+<nav class="fs-pager" aria-label="{{ label | default('Pages') }}">
+  <span class="fs-pager__meta dim">
+    {% set range_end = [pager.page * pager.page_size, pager.total] | min %}
+    Showing {{ (pager.page - 1) * pager.page_size + 1 }}&ndash;{{ range_end }} of {{ pager.total }}
+    &middot; Page {{ pager.page }} of {{ pager.page_count }}
+  </span>
+  <span class="fs-pager__actions">
+    {% if pager.prev_href %}
+      <a class="btn ghost" href="{{ pager.prev_href }}" rel="prev">Previous</a>
+    {% endif %}
+    {% if pager.next_href %}
+      <a class="btn ghost" href="{{ pager.next_href }}" rel="next">Next</a>
+    {% endif %}
+  </span>
+</nav>
+{% endif %}

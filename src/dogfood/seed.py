@@ -511,12 +511,21 @@ def _seed_demo_event(conn: sqlite3.Connection) -> str:
         """,
         (
             DEMO_EVENT_ID,
-            "Deadline Demo (not fixture data)",
+            "Sandbox event",
             "deadline-demo",
-            "An open event, so the submit-edit-deadline lifecycle can be exercised. "
-            "Contains no fixture projects.",
+            "Open submissions for trying the submit and draft flow. "
+            "No seeded projects — create a team and submit here.",
             now,
             now,
+        ),
+    )
+    conn.execute(
+        "UPDATE events SET name = ?, description = ? WHERE id = ?",
+        (
+            "Sandbox event",
+            "Open submissions for trying the submit and draft flow. "
+            "No seeded projects — create a team and submit here.",
+            DEMO_EVENT_ID,
         ),
     )
     conn.execute(
@@ -540,6 +549,11 @@ def _seed_demo_event(conn: sqlite3.Connection) -> str:
             (f"crt_{DEMO_EVENT_ID}_{key}", DEMO_EVENT_ID, key, label, weight),
         )
     return DEMO_EVENT_ID
+
+
+def ensure_dev_logins(conn: sqlite3.Connection, *, dev_tokens: bool) -> list[dict[str, str]]:
+    """Recreate labeled demo sessions (idempotent). Safe on every /login view."""
+    return _seed_operators(conn, dev_tokens=dev_tokens)
 
 
 def _seed_operators(conn: sqlite3.Connection, *, dev_tokens: bool) -> list[dict[str, str]]:

@@ -108,9 +108,19 @@ def dev_login(request: Request, conn: Conn, body: DevLoginIn, response: Response
 
 
 @router.post("/logout", summary="Revoke the current session token")
-def logout(conn: Conn, who: Who, response: Response) -> dict[str, Any]:
+def logout(request: Request, conn: Conn, who: Who, response: Response) -> dict[str, Any]:
     if who.token:
-        conn.execute("DELETE FROM sessions WHERE token = ?", (who.token,))
+        keep = False
+        if request.app.state.settings.dev_tokens:
+            row = query_one(
+                conn, "SELECT label FROM sessions WHERE token = ?", (who.token,)
+            )
+            if row and row["label"] in DEV_LOGIN_LABELS:
+                # Demo quick sign-in reuses fixed labeled rows; deleting them
+                # empties the buttons on /login after each try-and-sign-out.
+                keep = True
+        if not keep:
+            conn.execute("DELETE FROM sessions WHERE token = ?", (who.token,))
         audit.record(
             conn, "auth.logout", actor_user_id=who.user_id or None, actor_role=who.role
         )

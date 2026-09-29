@@ -1,5 +1,10 @@
-﻿DOGFOOD 2026 -- cross-judge normalization proof
+DOGFOOD 2026 -- cross-judge normalization proof
 ==============================================================================
+
+The brief site's FIG. 03 used illustrative numbers (sigma 0.94 -> 0.31).
+Every figure below is computed from fixtures.json. Raw between-judge
+sigma is the population stdev of per-judge means (~0.41; sample stdev
+~0.42). Build against those values, not the illustration.
 
 observations        126
 projects            41  (1 excluded from ranking as duplicates)
@@ -106,4 +111,22 @@ LARGEST RANK MOVEMENTS
    +5 up   prj_14    Green Lantern            raw rank 28 -> 23
    +5 up   prj_24    Glass Beacon             raw rank 20 -> 15
    +5 up   prj_30    Paper Harbour            raw rank 37 -> 32
+
+LABELLED SYNTHETIC PANEL (validation; not a substitute for the fixture)
+------------------------------------------------------------------------------
+Same (judge, project) cells as fixtures.json. Scores are generated from
+known project effects p_i, known judge biases b_j, and Gaussian noise:
+  y_ij = 3.5 + p_i + b_j + e_ij,  p~N(0,0.55), b~N(0,0.8), e~N(0,0.3)
+  seed 20260301; clipped to the 1-5 rubric; 126 cells, 41 projects, 30 judges
+
+  recovery vs planted truth
+    Pearson(p_i, recovered project effect)   +0.8718
+    Pearson(b_j, recovered judge bias)       +0.9630
+    Kendall tau, raw means vs true ranking   +0.6488
+    Kendall tau, calibrated vs true ranking  +0.6707
+    between-judge sigma  0.7851 -> 0.3803  converged=True
+
+  Calibrated ranks match the planted project ranking more closely
+  than raw means do: the estimator recovers a known effect on this
+  missingness pattern, not only a smaller judge spread.
 

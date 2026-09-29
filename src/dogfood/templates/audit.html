@@ -50,8 +50,13 @@
   </div>
 </form>
 
+{% if pager and pager.total > pager.page_size %}
+  {% set label = 'Audit log pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
+
 <div class="panel scroll">
-  <table>
+  <table class="audit-table">
     <thead><tr>
       <th class="num">seq</th><th>when</th><th>actor</th><th>action</th>
       <th>target</th><th>reason</th><th>detail</th><th>hash</th>
@@ -72,15 +77,16 @@
           </td>
           <td class="mono dim">{{ e.target_type or '' }}{% if e.target_id %}:{{ e.target_id }}{% endif %}</td>
           <td class="mono">{{ e.reason_code or '' }}</td>
-          <td class="dim mono" style="max-width:340px; overflow:hidden; text-overflow:ellipsis">
-            {{ e.detail | tojson }}
-          </td>
-          <td class="mono dim">{{ e.entry_hash[:10] }}</td>
+          <td class="audit-detail mono">{{ e.detail | tojson }}</td>
+          <td class="audit-hash mono dim">{{ e.entry_hash[:10] }}</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 
-</div>
+{% if pager and pager.total > pager.page_size %}
+  {% set label = 'Audit log pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
 {% endblock %}

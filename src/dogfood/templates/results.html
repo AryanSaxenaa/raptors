@@ -10,7 +10,7 @@
     <h1>Normalized results</h1>
     <p class="lede">
       {{ result.observations }} ballots from {{ result.judges | length }} judges
-      across {{ leaderboard | length }} projects.
+      across {{ leaderboard_total if leaderboard_total is defined else (leaderboard | length) }} projects.
     </p>
   </header>
 </div>
@@ -72,7 +72,11 @@
 </div>
 
 <h2>Leaderboard</h2>
-<div class="panel scroll">
+{% if pager and pager.total > pager.page_size %}
+  {% set label = 'Leaderboard pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
+<div class="panel">
   <table>
     <thead><tr>
       <th class="num">#</th><th>Project</th><th>Team</th><th>Track</th>
@@ -108,12 +112,21 @@
     </tbody>
   </table>
 </div>
+{% if pager and pager.total > pager.page_size %}
+  {% set label = 'Leaderboard pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
 <p class="sum">
   Rank movement compares the raw ranking with the calibrated one. A project that
   moves was sensitive to which judges happened to see it.
 </p>
 
 <h2>Judge diagnostics</h2>
+{% if diag_pager and diag_pager.total > diag_pager.page_size %}
+  {% set pager = diag_pager %}
+  {% set label = 'Judge diagnostics pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
 <div class="panel scroll">
   <table>
     <thead><tr>
@@ -121,7 +134,7 @@
       <th class="num">shrunk &sigma;</th><th class="num">scale</th><th class="num">bias</th><th>flags</th>
     </tr></thead>
     <tbody>
-      {% for j in result.judges %}
+      {% for j in judge_diagnostics %}
         <tr>
           <td class="mono">{{ j.judge_id }}</td>
           <td class="num">{{ j.n_reviews }}</td>
@@ -139,6 +152,11 @@
     </tbody>
   </table>
 </div>
+{% if diag_pager and diag_pager.total > diag_pager.page_size %}
+  {% set pager = diag_pager %}
+  {% set label = 'Judge diagnostics pages' %}
+  {% include "_pager.html" with context %}
+{% endif %}
 <p class="sum">
   A positive bias is a generous judge; the correction subtracts it.
   <b>Flat</b> means every score was the same. <b>Single ballot</b> means bias is only partly identifiable.

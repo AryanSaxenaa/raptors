@@ -5,12 +5,6 @@
 <link rel="stylesheet" href="{{ static_url('field-station-pages.css') }}">
 {% endblock %}
 
-{% block atmosphere %}
-<div class="fx-ornament fx-ornament--br" aria-hidden="true">
-  <canvas data-fx="grid"></canvas>
-</div>
-{% endblock %}
-
 {#
   Server-rendered titles for acceptance greps. Default sort is arrival; page size 200.
   Community vote controls sit on each card. Ballot shuffle stays on the API —
@@ -29,7 +23,7 @@
       Browse submissions, filter by track, and leave comments.
       {% if who.is_anonymous %}
         Sign in to spend community credits.
-      {% else %}
+      {% elif can_vote %}
         Spend community credits from any project card.
       {% endif %}
     </p>
@@ -37,39 +31,51 @@
 </div>
 
 <section class="fs-vote-intro" id="community-vote" aria-labelledby="community-vote-heading">
-  <p class="section-label">Community vote</p>
-  <h2 id="community-vote-heading">Quadratic credits</h2>
-  <p class="fs-vote-intro__lede">
-    You have <b>{{ credit_budget }}</b> credits for <b>{{ vote_event.name }}</b>.
-    Influence on a project is the square root of the credits you put there, so
-    stacking the budget on one favourite buys less and less.
-  </p>
-  <form class="fs-vote-event" method="get" action="/projects">
-    {% if filters.q %}<input type="hidden" name="q" value="{{ filters.q }}">{% endif %}
-    {% if filters.track %}<input type="hidden" name="track" value="{{ filters.track }}">{% endif %}
-    {% if filters.tag %}<input type="hidden" name="tag" value="{{ filters.tag }}">{% endif %}
-    {% if filters.sort != 'arrival' %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
-    <label for="vote-event">Event</label>
-    <select id="vote-event" name="event" onchange="this.form.submit()">
-      {% for e in events %}
-        <option value="{{ e.id }}" {% if e.id == vote_event.id %}selected{% endif %}>{{ e.name }}</option>
-      {% endfor %}
-    </select>
-  </form>
-  <div class="fs-credit-strip" aria-live="polite">
-    <div class="fs-credit-strip__track">
-      <span class="fs-credit-strip__fill" id="credit-fill"></span>
-    </div>
-    <p class="fs-credit-strip__label ballot-budget" id="budget">
-      {% if who.is_anonymous %}
-        <a href="/login">Sign in</a> to spend credits on projects.
-      {% else %}
-        Loading your credit budget…
-      {% endif %}
-    </p>
+  <div class="fs-vote-intro__top">
+    <header class="fs-vote-intro__title">
+      <p class="fs-eyebrow">Vote</p>
+      <h2 id="community-vote-heading">Community vote</h2>
+    </header>
+    <form class="fs-vote-event" method="get" action="/projects">
+      {% if filters.q %}<input type="hidden" name="q" value="{{ filters.q }}">{% endif %}
+      {% if filters.track %}<input type="hidden" name="track" value="{{ filters.track }}">{% endif %}
+      {% if filters.tag %}<input type="hidden" name="tag" value="{{ filters.tag }}">{% endif %}
+      {% if filters.sort != 'arrival' %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+      <label for="vote-event">Event</label>
+      <select id="vote-event" name="event" onchange="this.form.submit()">
+        {% for e in events %}
+          <option value="{{ e.id }}" {% if e.id == vote_event.id %}selected{% endif %}>{{ e.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
   </div>
-  <div id="flash" class="notice" hidden></div>
-  <p class="fs-vote-note sum">
+  <p class="fs-vote-intro__lede">
+    {{ credit_budget }} credits on <b>{{ vote_event.name }}</b>.
+    Influence is the square root of credits on a project, so stacking on one favourite buys less and less.
+  </p>
+  {% if who.is_anonymous %}
+    <p class="fs-vote-signin-hint">
+      <a href="/login">Sign in</a> to spend credits on projects.
+    </p>
+  {% elif can_vote %}
+    <div class="fs-credit-stats" aria-live="polite">
+      <div class="fs-credit-stat">
+        <div class="fs-credit-stat__n" id="credit-remaining">{{ credit_budget }}</div>
+        <div class="fs-credit-stat__k">remaining</div>
+      </div>
+      <div class="fs-credit-stat">
+        <div class="fs-credit-stat__n" id="credit-spent">0</div>
+        <div class="fs-credit-stat__k">spent</div>
+      </div>
+      <div class="fs-credit-stat">
+        <div class="fs-credit-stat__n">{{ credit_budget }}</div>
+        <div class="fs-credit-stat__k">budget</div>
+      </div>
+    </div>
+    <p class="visually-hidden" id="budget">Loading your credit budget…</p>
+  {% endif %}
+  <div id="flash" class="notice fs-vote-flash" hidden></div>
+  <p class="fs-vote-note">
     {% if show_vote_tallies %}
       Vote totals are visible for this event.
     {% else %}
@@ -77,8 +83,6 @@
     {% endif %}
   </p>
 </section>
-
-<hr class="fs-hairline" aria-hidden="true">
 
 <form class="fs-toolbar gallery-toolbar" method="get" action="/projects">
   {% if filters.event %}
@@ -190,15 +194,17 @@
                 <div class="gallery-card__vote gallery-card__vote--locked">
                   <a class="btn ghost" href="/login">Sign in to vote</a>
                 </div>
-              {% else %}
+              {% elif can_vote %}
               <div class="gallery-card__vote fs-vote-stepper">
                 <span class="gallery-card__spent dim" data-spent="{{ p.id }}">Your credits: 0</span>
                 <div class="fs-stepper-row">
-                  <button type="button" class="fs-stepper-btn" data-step="-1" data-project="{{ p.id }}" aria-label="Fewer credits">−</button>
-                  <label class="visually-hidden" for="credits-{{ p.id }}">Credits for {{ p.title }}</label>
-                  <input type="number" class="ballot-credits fs-stepper-input" id="credits-{{ p.id }}"
-                         min="1" max="{{ credit_budget }}" value="1" data-project="{{ p.id }}">
-                  <button type="button" class="fs-stepper-btn" data-step="1" data-project="{{ p.id }}" aria-label="More credits">+</button>
+                  <div class="fs-stepper-group">
+                    <button type="button" class="fs-stepper-btn" data-step="-1" data-project="{{ p.id }}" aria-label="Fewer credits">−</button>
+                    <label class="visually-hidden" for="credits-{{ p.id }}">Credits for {{ p.title }}</label>
+                    <input type="number" class="ballot-credits fs-stepper-input" id="credits-{{ p.id }}"
+                           min="1" max="{{ credit_budget }}" value="1" data-project="{{ p.id }}" inputmode="numeric">
+                    <button type="button" class="fs-stepper-btn" data-step="1" data-project="{{ p.id }}" aria-label="More credits">+</button>
+                  </div>
                   <button type="button" class="fs-vote-btn" data-vote="{{ p.id }}">Cast vote</button>
                 </div>
               </div>
@@ -209,26 +215,13 @@
       </div>
     {% endif %}
 
-    {% if total > page_size %}
-      {% set base_qs = query_string %}
-      <nav class="gallery-pager fs-pager" aria-label="Gallery pages">
-        <span class="dim">Page {{ page }} of {{ (total + page_size - 1) // page_size }}</span>
-        {% if page > 1 %}
-          {% set prev_qs = base_qs ~ ('&' if base_qs else '') ~ 'page=' ~ (page - 1) %}
-          <a class="btn ghost" href="/projects?{{ prev_qs }}">Previous</a>
-        {% endif %}
-        {% if page * page_size < total %}
-          {% set next_qs = base_qs ~ ('&' if base_qs else '') ~ 'page=' ~ (page + 1) %}
-          <a class="btn ghost" href="/projects?{{ next_qs }}">Next</a>
-        {% endif %}
-      </nav>
-    {% endif %}
+    {% include "_pager.html" with context %}
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-{% if not who.is_anonymous %}
+{% if can_vote and not who.is_anonymous %}
 <script>
 const eventId = {{ vote_event.id | tojson }};
 const creditBudget = {{ credit_budget | tojson }};
@@ -239,18 +232,20 @@ function spentLabel(root, projectId, credits) {
 }
 
 function updateCreditStrip(spent, budget) {
-  const fill = document.getElementById('credit-fill');
-  if (fill && budget > 0) {
-    fill.style.width = Math.min(100, (100 * spent / budget)).toFixed(1) + '%';
-  }
+  const remaining = document.getElementById('credit-remaining');
+  const spentEl = document.getElementById('credit-spent');
+  if (remaining) remaining.textContent = String(Math.max(0, budget - spent));
+  if (spentEl) spentEl.textContent = String(spent);
 }
 
 async function loadBallot() {
   const ballot = await api('GET', '/api/events/' + eventId + '/ballot');
   const budget = document.getElementById('budget');
-  budget.textContent =
-    'Mode: ' + ballot.voter_mode + ' · spent ' + ballot.credits_spent +
-    ' / ' + ballot.credit_budget + ' credits · remaining ' + ballot.credits_remaining;
+  if (budget) {
+    budget.textContent =
+      'Spent ' + ballot.credits_spent + ' of ' + ballot.credit_budget +
+      ' credits, ' + ballot.credits_remaining + ' remaining.';
+  }
   updateCreditStrip(ballot.credits_spent, ballot.credit_budget);
   const grid = document.querySelector('.gallery-grid');
   if (!grid) return;
