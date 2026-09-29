@@ -376,6 +376,7 @@ CREATE INDEX IF NOT EXISTS webhooks_event_idx ON webhooks (event_id, active);
 CREATE TABLE IF NOT EXISTS webhook_deliveries (
     id          TEXT PRIMARY KEY,
     webhook_id  TEXT NOT NULL REFERENCES webhooks (id) ON DELETE CASCADE,
+    outbox_id   TEXT,
     action      TEXT NOT NULL,
     status_code INTEGER,
     success     INTEGER NOT NULL CHECK (success IN (0, 1)),
@@ -385,6 +386,7 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 );
 
 CREATE INDEX IF NOT EXISTS webhook_deliveries_hook_idx ON webhook_deliveries (webhook_id, created_at);
+CREATE INDEX IF NOT EXISTS webhook_deliveries_outbox_idx ON webhook_deliveries (outbox_id, webhook_id, success);
 
 CREATE TABLE IF NOT EXISTS webhook_outbox (
     id           TEXT PRIMARY KEY,

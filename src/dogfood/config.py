@@ -86,9 +86,10 @@ def load_settings() -> Settings:
 settings = load_settings()
 
 # Gallery cards per page. Fixture titles are spread across pages; smoke walks pages.
+# Arrival sort is by project id so prj_01–prj_03 stay on page one.
 GALLERY_PAGE_SIZE = 18
 
 # Long HTML tables (judge queue, audit, results leaderboard).
 TABLE_PAGE_SIZE = 20
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"

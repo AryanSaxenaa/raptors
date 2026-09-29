@@ -26,7 +26,8 @@ from fastapi.templating import Jinja2Templates
 from .config import SCHEMA_VERSION, Settings, settings as default_settings
 from .db import connect, init_schema, query_one, scalar, transaction
 from .deps import Conn
-from .errors import install_error_handlers
+from .errors import PROBLEM_MEDIA_TYPE, ApiError, install_error_handlers
+from .security import check_origin
 from .seed import load_fixture_file, seed
 
 DESCRIPTION = """
@@ -162,6 +163,29 @@ def create_app(config: Settings | None = None, *, run_bootstrap: bool = True) ->
 
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            try:
+                current = request.app.state.settings
+                host = (request.url.hostname or "localhost").lower()
+                netloc = (request.url.netloc or host).lower()
+                allowed = {host, netloc, "localhost", "127.0.0.1"}
+                if request.url.port:
+                    port = request.url.port
+                    allowed.update(
+                        {
+                            f"{host}:{port}",
+                            f"localhost:{port}",
+                            f"127.0.0.1:{port}",
+                        }
+                    )
+                check_origin(request, allowed, strict=current.strict_origin)
+            except ApiError as exc:
+                await request.body()
+                return JSONResponse(
+                    exc.to_problem(str(request.url.path)),
+                    status_code=exc.status,
+                    media_type=PROBLEM_MEDIA_TYPE,
+                )
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
         started = time.perf_counter()
         response = await call_next(request)

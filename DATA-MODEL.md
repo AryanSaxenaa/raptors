@@ -7,7 +7,7 @@ Hand-written DDL lives in `src/dogfood/schema.sql`. There is no ORM. Every CHECK
 ## Conventions
 
 1. **Ids are opaque TEXT.** Fixture ids (`evt_01`, `prj_07`, `jdg_01`, `tm_07`) are stored verbatim so a record in the JSON file and a row in SQLite are the same object.
-2. **Everything below `events` carries `event_id`.** Nothing is globally scoped; a second event cannot read the first by omission.
+2. **Everything below `events` carries `event_id`.** Nothing is globally scoped; a second event cannot read the first by omission. `/projects` and `/api/projects` default to the fixture event (`evt_01`); pass `event` / `event_id` for the sandbox or another event.
 3. **Timestamps are ISO-8601 UTC strings.** Deadline comparison uses parsed instants, not string sort, in `require_submissions_open`.
 4. **JSON-in-TEXT** only where the list is bounded: `tech_tags`, webhook `actions`, custom question `options`. Relational data (images, criteria, members) is tables, not nested arrays.
 
@@ -24,7 +24,7 @@ A judge is a **user** plus a per-event `judges` row. The role matrix has one sub
 
 | Table | Role |
 | --- | --- |
-| `events` | Deadlines, voting window, `voting_access` (`authenticated` \| `email` \| `open`), `results_published`, `reviews_per_project`, `normalization_method`, `exclude_duplicates`, `rubric_version`. |
+| `events` | Deadlines, voting window, `voting_access` (`authenticated` \| `email` \| `open`), `results_published`, `reviews_per_project`, `normalization_method`, `exclude_duplicates`, `rubric_version`. Writes reject inverted timelines (close before open, vote before submissions close). |
 | `tracks` | UNIQUE `(event_id, name)`. |
 | `prizes` | Optional `amount_cents` / currency. |
 | `rubric_criteria` | Weighted keys; replacing the set increments `rubric_version`. |
@@ -71,7 +71,7 @@ Solo teams (13 in the fixture) have no minimum-member constraint.
 | `votes` | UNIQUE `(event_id, project_id, voter_key)`; `credits` for quadratic influence. |
 | `rate_limits` | Sliding windows for comments and votes. |
 | `audit_log` | Append-only, `prev_hash` / `entry_hash`. No UPDATE/DELETE in application code. |
-| `webhooks`, `webhook_deliveries`, `webhook_outbox` | Signed POSTs; outbox with `attempts` / `next_try_at` retries so audit writes never block on HTTP. |
+| `webhooks`, `webhook_deliveries`, `webhook_outbox` | Signed POSTs; outbox with `attempts` / `next_try_at` retries so audit writes never block on HTTP. `webhook_deliveries.outbox_id` lets retries skip destinations that already succeeded for that event. |
 | `issued_records` | Persisted judge records and project certificates, keyed by `record_hash`. |
 
 Indexes exist on every foreign-key lookup used by the gallery, judge queue, and audit filters (`projects_gallery_idx`, `audit_action_idx`, …).

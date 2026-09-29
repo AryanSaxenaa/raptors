@@ -287,7 +287,7 @@ def gallery(
         list_sort = "arrival"
     items, total = gallery_rows(
         conn,
-        event_id=event,
+        event_id=vote_event_id,
         q=q,
         track=track,
         team=team,
@@ -300,8 +300,10 @@ def gallery(
     tracks = query(
         conn,
         "SELECT tr.id, tr.name, COUNT(p.id) AS n FROM tracks tr "
-        "LEFT JOIN projects p ON p.track_id = tr.id AND p.status IN "
-        "('submitted','flagged_duplicate') GROUP BY tr.id ORDER BY tr.id",
+        "LEFT JOIN projects p ON p.track_id = tr.id AND p.event_id = tr.event_id "
+        "AND p.status IN ('submitted','flagged_duplicate') "
+        "WHERE tr.event_id = ? GROUP BY tr.id ORDER BY tr.id",
+        (vote_event_id,),
     )
     track_rows = [dict(t) for t in tracks]
     list_qs = _gallery_query_string(

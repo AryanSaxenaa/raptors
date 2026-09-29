@@ -406,7 +406,7 @@ def lifecycle() -> None:
     )
     check("a draft can be edited and submitted", status == 200, str(status))
 
-    status, text, _ = request("/projects", accept="text/html")
+    status, text, _ = request(f"/projects?event={DEMO_EVENT}", accept="text/html")
     check("a submitted project appears in the gallery", probe_title in text)
 
     status, _, _ = request(

@@ -442,7 +442,10 @@ def _project_payload(conn: sqlite3.Connection, project_id: str) -> dict[str, Any
 
 
 _GALLERY_SORT: dict[str, str] = {
-    "arrival": "p.submitted_at ASC, p.id ASC",
+    # Id order, not submitted_at: fixture prj_01–prj_03 stay on page one, which
+    # is where smoke and run.py look. submitted_at spreads those titles across
+    # later pages once page size is smaller than the field.
+    "arrival": "p.id ASC",
     "newest": "p.submitted_at DESC, p.id DESC",
     "title": "p.title COLLATE NOCASE ASC, p.id ASC",
     "track": "tr.name COLLATE NOCASE ASC, p.title COLLATE NOCASE ASC",
@@ -494,13 +497,14 @@ def gallery_rows(
     ballot API is shuffled per voter, but this query must stay in arrival
     order on the default path.
     """
+    if not event_id:
+        event_id = default_event_id(conn)
     if sort == "votes" and not reveal_vote_tallies:
         sort = "arrival"
     clauses = ["p.status IN ('submitted', 'flagged_duplicate')"]
     params: list[Any] = []
-    if event_id:
-        clauses.append("p.event_id = ?")
-        params.append(event_id)
+    clauses.append("p.event_id = ?")
+    params.append(event_id)
     if track:
         clauses.append("p.track_id = ?")
         params.append(track)
@@ -577,6 +581,7 @@ def list_projects(
     limit: int = Query(default=GALLERY_PAGE_SIZE, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
+    event_id = event_id or default_event_id(conn)
     reveal = vote_tallies_visible(conn, who, event_id)
     items, total = gallery_rows(
         conn,

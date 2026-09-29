@@ -78,7 +78,7 @@ def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
 
 
 def apply_migrations(conn: sqlite3.Connection) -> None:
-    """Additive alters for databases created before SCHEMA_VERSION 2.
+    """Additive alters for databases created before the current SCHEMA_VERSION.
 
     CREATE TABLE IF NOT EXISTS will not add columns to an existing table.
     """
@@ -95,6 +95,13 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         )
     if "next_try_at" not in outbox_cols:
         conn.execute("ALTER TABLE webhook_outbox ADD COLUMN next_try_at TEXT")
+    delivery_cols = _table_columns(conn, "webhook_deliveries")
+    if "outbox_id" not in delivery_cols:
+        conn.execute("ALTER TABLE webhook_deliveries ADD COLUMN outbox_id TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS webhook_deliveries_outbox_idx "
+        "ON webhook_deliveries (outbox_id, webhook_id, success)"
+    )
 
 
 def init_schema(conn: sqlite3.Connection) -> None:

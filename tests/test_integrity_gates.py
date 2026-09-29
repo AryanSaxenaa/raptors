@@ -31,7 +31,7 @@ def test_cannot_publish_results_while_voting_open(client):
 def test_votes_stop_after_results_are_published(client):
     closed = client.patch(
         f"/api/events/{FIXTURE_EVENT}",
-        json={"voting_closes_at": "2020-01-01T00:00:00Z", "results_published": True},
+        json={"voting_closes_at": "2026-09-01T00:00:00Z", "results_published": True},
         headers=auth(ORG_TOKEN),
     )
     assert closed.status_code == 200
@@ -201,3 +201,115 @@ def test_event_json_export_includes_configuration(client):
     assert "voting_access" in payload["event"]
     assert "images" in payload["projects"][0]
     assert "custom_answers" in payload["projects"][0]
+
+
+def test_default_gallery_is_fixture_event_and_shows_first_titles(client):
+    body = client.get("/projects").text
+    for title in ("Glass Signal", "Small Meadow", "Deep Compass"):
+        assert title in body
+    listed = client.get("/api/projects").json()["projects"]
+    assert listed
+    assert all(p.get("event_id") == FIXTURE_EVENT for p in listed)
+    sandbox = client.get("/api/projects", params={"event_id": DEMO_EVENT}).json()["projects"]
+    sandbox_ids = {p["id"] for p in sandbox}
+    listed_ids = {p["id"] for p in listed}
+    assert sandbox_ids.isdisjoint(listed_ids)
+
+
+def test_schedule_order_is_rejected(client):
+    created = client.post(
+        "/api/events",
+        json={
+            "name": "Backwards vote",
+            "submissions_close": "2026-06-01T00:00:00Z",
+            "voting_opens_at": "2026-05-01T00:00:00Z",
+            "voting_closes_at": "2026-07-01T00:00:00Z",
+        },
+        headers=auth(ORG_TOKEN),
+    )
+    assert created.status_code == 400
+    inverted = client.patch(
+        f"/api/events/{FIXTURE_EVENT}",
+        json={"voting_closes_at": "2020-01-01T00:00:00Z"},
+        headers=auth(ORG_TOKEN),
+    )
+    assert inverted.status_code == 400
+
+
+def test_strict_origin_rejects_foreign_host(client, app):
+    from dataclasses import replace
+
+    original = app.state.settings
+    app.state.settings = replace(original, strict_origin=True)
+    try:
+        ok = client.post(
+            "/api/auth/logout",
+            headers=auth(PARTICIPANT_TOKEN),
+        )
+        assert ok.status_code != 403 or ok.json().get("code") != "origin_rejected"
+        blocked = client.post(
+            "/api/auth/logout",
+            headers={**auth(PARTICIPANT_TOKEN), "Origin": "https://evil.example"},
+        )
+        assert blocked.status_code == 403
+        assert blocked.json()["code"] == "origin_rejected"
+    finally:
+        app.state.settings = original
+
+
+def test_webhook_retry_skips_successful_destinations(client, settings):
+    from unittest.mock import MagicMock, patch
+
+    import httpx
+
+    from dogfood.webhooks import flush_outbox
+
+    good = client.post(
+        "/api/webhooks",
+        json={"url": "https://example.com/ok", "event_id": FIXTURE_EVENT},
+        headers=auth(ORG_TOKEN),
+    )
+    assert good.status_code == 201
+    bad = client.post(
+        "/api/webhooks",
+        json={"url": "http://127.0.0.1:9/unreachable", "event_id": FIXTURE_EVENT},
+        headers=auth(ORG_TOKEN),
+    )
+    assert bad.status_code == 201
+    comment = client.post(
+        "/api/projects/prj_01/comments",
+        json={"body": "retry destination isolation"},
+        headers=auth(PARTICIPANT_TOKEN),
+    )
+    assert comment.status_code in (201, 403, 429)
+
+    def fake_post(url, **_kwargs):
+        if "127.0.0.1:9" in str(url):
+            raise httpx.ConnectError("refused")
+        response = MagicMock()
+        response.status_code = 200
+        response.text = "ok"
+        return response
+
+    conn = connect(settings.db_path)
+    try:
+        with patch("dogfood.webhooks.httpx.post", side_effect=fake_post):
+            flush_outbox(conn)
+            good_id = good.json()["id"]
+            first = conn.execute(
+                "SELECT COUNT(*) FROM webhook_deliveries WHERE webhook_id = ? AND success = 1",
+                (good_id,),
+            ).fetchone()[0]
+            conn.execute(
+                "UPDATE webhook_outbox SET next_try_at = '2000-01-01T00:00:00Z' "
+                "WHERE processed_at IS NULL"
+            )
+            flush_outbox(conn)
+            second = conn.execute(
+                "SELECT COUNT(*) FROM webhook_deliveries WHERE webhook_id = ? AND success = 1",
+                (good_id,),
+            ).fetchone()[0]
+        assert first >= 1
+        assert first == second
+    finally:
+        conn.close()

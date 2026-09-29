@@ -32,6 +32,52 @@ def _require_event_timestamps(**fields: str | None) -> None:
         require_iso_ts(value, field)
 
 
+def _require_schedule_order(**fields: str | None) -> None:
+    """Reject inverted event timelines (open after close, vote before submit)."""
+    parsed = {key: require_iso_ts(value, key) for key, value in fields.items()}
+
+    def _before(earlier: str, later: str, message: str) -> None:
+        start, end = parsed.get(earlier), parsed.get(later)
+        if start is not None and end is not None and start > end:
+            raise ApiError("invalid_request", message)
+
+    _before(
+        "submissions_open_at",
+        "submissions_close",
+        "submissions cannot close before they open",
+    )
+    _before(
+        "voting_opens_at",
+        "voting_closes_at",
+        "voting cannot close before it opens",
+    )
+    _before(
+        "submissions_close",
+        "voting_opens_at",
+        "voting cannot open before submissions close",
+    )
+
+
+def _schedule_from_event(event: Any, fields: dict[str, Any]) -> dict[str, str | None]:
+    keys = (
+        "starts_at",
+        "submissions_open_at",
+        "submissions_close",
+        "voting_opens_at",
+        "voting_closes_at",
+    )
+    merged: dict[str, str | None] = {}
+    for key in keys:
+        if key in fields:
+            merged[key] = fields[key]
+        else:
+            try:
+                merged[key] = event[key]
+            except (KeyError, IndexError):
+                merged[key] = None
+    return merged
+
+
 def _require_voting_access(value: str | None) -> str | None:
     if value is None:
         return None
@@ -81,6 +127,7 @@ class EventPatch(BaseModel):
 
     name: str | None = None
     description: str | None = None
+    submissions_open_at: str | None = None
     submissions_close: str | None = None
     voting_opens_at: str | None = None
     voting_closes_at: str | None = None
@@ -235,6 +282,12 @@ def create_event(conn: Conn, who: Who, body: EventIn) -> dict[str, Any]:
         voting_opens_at=body.voting_opens_at,
         voting_closes_at=body.voting_closes_at,
     )
+    _require_schedule_order(
+        submissions_open_at=body.submissions_open_at,
+        submissions_close=body.submissions_close,
+        voting_opens_at=body.voting_opens_at,
+        voting_closes_at=body.voting_closes_at,
+    )
     access = _require_voting_access(body.voting_access) or "authenticated"
     event_id = f"evt_{secrets.token_hex(4)}"
     with transaction(conn):
@@ -282,6 +335,8 @@ def patch_event(conn: Conn, who: Who, event_id: str, body: EventPatch) -> dict[s
         **{
             key: fields[key]
             for key in (
+                "starts_at",
+                "submissions_open_at",
                 "submissions_close",
                 "voting_opens_at",
                 "voting_closes_at",
@@ -289,6 +344,7 @@ def patch_event(conn: Conn, who: Who, event_id: str, body: EventPatch) -> dict[s
             if key in fields
         }
     )
+    _require_schedule_order(**_schedule_from_event(event, fields))
     if "voting_access" in fields:
         fields["voting_access"] = _require_voting_access(fields["voting_access"])
     if "normalization_method" in fields:

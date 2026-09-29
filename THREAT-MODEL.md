@@ -17,8 +17,10 @@ Scope: a **self-hosted** hackathon portal run by an organizer who controls the s
 | Vote stuffing | Quadratic budget (9 credits); one `voter_key` per project; 30 votes / hour | `community.py` |
 | Position bias on ballots | Seeded shuffle per voter | `GET /api/events/{id}/ballot` |
 | CSV formula injection | `csv.writer` quoting | `tests/test_csv.py` |
-| CSRF on JSON writes | Opaque credential; optional `DOGFOOD_STRICT_ORIGIN` | config |
+| CSRF on JSON writes | Opaque credential; `DOGFOOD_STRICT_ORIGIN` checked on mutating requests | `app.py` middleware + `check_origin` |
 | Webhook blocking writes | Outbox + background worker | `tests/test_webhooks_and_ui.py` |
+| Webhook retry duplicates | Successful destinations are skipped on later attempts | `webhooks.process_outbox_batch` |
+| Impossible event calendar | Open/close and submit/vote order checked on write | `events._require_schedule_order` |
 | XSS on voting UI | DOM `textContent`, no `innerHTML` | vote template test |
 | Deadline gaming via clock | Compare stored UTC close to server now; invalid timestamps rejected on write | `require_iso_ts` |
 | Publish during voting | `results_published` blocked until `voting_closes_at` | `events.patch_event` |
@@ -45,6 +47,7 @@ Results stay embargoed (`results_published = 0`) from participants and visitors.
 | Pairwise judging | Not implemented (`JUDGING.md`). |
 | PKI certificates | Records are hash-anchored JSON, not CA-signed. |
 | Submission scraping | The gallery is **public by design** (T1). Robots can copy titles. That is the product. |
+| Webhook consumer duplicates | Failed destinations are retried (at-least-once). Successful destinations are not re-POSTed for the same outbox row. Consumers should still key on action + payload. |
 | Timing oracle on login | We do not claim constant-time user enumeration beyond scrypt cost. |
 
 ## Recommended production settings

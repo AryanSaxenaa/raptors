@@ -264,7 +264,9 @@ def seed(
                 "Submissions closed at the fixture deadline."
             ),
             event.get("submissions_close"),
-            event.get("voting_opens_at") or "2020-01-01T00:00:00Z",
+            event.get("voting_opens_at")
+            or event.get("submissions_close")
+            or "2026-03-01T18:00:00Z",
             event.get("voting_closes_at") or "2099-01-01T00:00:00Z",
             voting_access,
             now,
@@ -608,7 +610,8 @@ def _seed_demo_event(conn: sqlite3.Connection) -> str:
         INSERT INTO events (id, name, slug, description, submissions_close,
                             voting_opens_at, voting_closes_at, reviews_per_project,
                             is_fixture, created_at)
-        VALUES (?, ?, ?, ?, '2099-01-01T00:00:00Z', ?, '2099-01-01T00:00:00Z', 3, 0, ?)
+        VALUES (?, ?, ?, ?, '2099-01-01T00:00:00Z', '2099-01-01T00:00:00Z',
+                '2099-01-01T00:00:00Z', 3, 0, ?)
         ON CONFLICT (id) DO NOTHING
         """,
         (
@@ -618,11 +621,12 @@ def _seed_demo_event(conn: sqlite3.Connection) -> str:
             "Open submissions for trying the submit and draft flow. "
             "No seeded projects — create a team and submit here.",
             now,
-            now,
         ),
     )
     conn.execute(
-        "UPDATE events SET name = ?, description = ? WHERE id = ?",
+        "UPDATE events SET name = ?, description = ?, "
+        "voting_opens_at = '2099-01-01T00:00:00Z', "
+        "voting_closes_at = '2099-01-01T00:00:00Z' WHERE id = ?",
         (
             "Sandbox event",
             "Open submissions for trying the submit and draft flow. "

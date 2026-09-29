@@ -19,4 +19,4 @@
 
 ## Schema version
 
-`schema_meta.version` must match `SCHEMA_VERSION` in code. Health reports both values; mismatch returns not-ready.
+`schema_meta.version` must match `SCHEMA_VERSION` in code (currently `"3"`). Health reports both values; mismatch returns not-ready. Additive columns (`voting_access`, outbox retry fields, `webhook_deliveries.outbox_id`) are applied by `apply_migrations()` on existing databases.

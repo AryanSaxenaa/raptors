@@ -19,7 +19,7 @@ from typing import Any
 
 import httpx
 
-from .db import connect, query, transaction, utcnow
+from .db import connect, query, query_one, transaction, utcnow
 
 DEFAULT_TIMEOUT = 2.0
 BATCH_SIZE = 10
@@ -71,11 +71,13 @@ def _deliver_one(
     conn: sqlite3.Connection,
     *,
     webhook_id: str,
+    outbox_id: str | None,
     url: str,
     secret: str,
     action: str,
     event_id: str | None,
     payload: dict[str, Any],
+    attempt: int = 1,
 ) -> tuple[bool, int | None, str | None]:
     body = {
         "action": action,
@@ -108,11 +110,11 @@ def _deliver_one(
         error = str(exc)[:500]
     conn.execute(
         """
-        INSERT INTO webhook_deliveries (id, webhook_id, action, status_code, success,
+        INSERT INTO webhook_deliveries (id, webhook_id, outbox_id, action, status_code, success,
                                         attempt, error, created_at)
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (delivery_id, webhook_id, action, status_code, success, error, utcnow()),
+        (delivery_id, webhook_id, outbox_id, action, status_code, success, attempt, error, utcnow()),
     )
     return bool(success), status_code, error
 
@@ -151,20 +153,31 @@ def process_outbox_batch(conn: sqlite3.Connection, *, limit: int = BATCH_SIZE) -
         event_id = row["event_id"]
         failed = False
         matched = False
+        attempt_n = int(row["attempts"] or 0) + 1
         for hook in hooks:
             if hook["event_id"] is not None and hook["event_id"] != event_id:
                 continue
             if not _matches(hook["actions"], action):
                 continue
             matched = True
+            already = query_one(
+                conn,
+                "SELECT 1 AS ok FROM webhook_deliveries "
+                "WHERE outbox_id = ? AND webhook_id = ? AND success = 1",
+                (row["id"], hook["id"]),
+            )
+            if already:
+                continue
             success, _, _ = _deliver_one(
                 conn,
                 webhook_id=hook["id"],
+                outbox_id=row["id"],
                 url=hook["url"],
                 secret=hook["secret"],
                 action=action,
                 event_id=event_id,
                 payload=payload,
+                attempt=attempt_n,
             )
             if not success:
                 failed = True
@@ -183,12 +196,12 @@ def process_outbox_batch(conn: sqlite3.Connection, *, limit: int = BATCH_SIZE) -
                     "UPDATE webhook_outbox SET attempts = ?, processed_at = ? WHERE id = ?",
                     (attempts, now, row["id"]),
                 )
-                processed += 1
             else:
                 conn.execute(
                     "UPDATE webhook_outbox SET attempts = ?, next_try_at = ? WHERE id = ?",
                     (attempts, _next_try_at(attempts), row["id"]),
                 )
+            processed += 1
             continue
         conn.execute(
             "UPDATE webhook_outbox SET processed_at = ?, attempts = ? WHERE id = ?",
